@@ -24,29 +24,47 @@
 		const downloadStart = document.getElementById('downloadStart');
 		const downloadEnd = document.getElementById('downloadEnd');
 
-		// WritableStreamを生成
-		const writableStream = new WritableStream({
-			write(chunk) {
-				streamTextOutput.textContent += chunk;
-			},
-			close() {
-				console.log('ストリームの書き込みが完了しました');
-			},
-			abort(err) {
-				console.error('エラーが発生しました', err);
+		// // WritableStreamを生成
+		// const writableStream = new WritableStream({
+		// 	write(chunk) {
+		// 		streamTextOutput.textContent += chunk;
+		// 	},
+		// 	close() {
+		// 		console.log('ストリームの書き込みが完了しました');
+		// 	},
+		// 	abort(err) {
+		// 		console.error('エラーが発生しました', err);
+		// 	}
+		// });
+
+		// // WritableStreamDefaultWriterを生成
+		// const writableStreamDefaultWriter = writableStream.getWriter();
+
+		// // テキストをストリームに追加
+		// addTextButton.addEventListener('click', () => {
+		// 	const text = addTextInput.value;
+		// 	addTextInput.value = '';
+		// 	writableStreamDefaultWriter.write(text);
+		// });
+
+		async function startDownload() {
+			// ルートの FileSystemDirectoryHandle オブジェクト
+			const root = await navigator.storage.getDirectory();
+			// sample.mp4 を生成して FileSystemFileHandle オブジェクトを取得
+			const fh = await root.getFileHandle('sample.txt', { create: true });
+			// FileSystemWritableFileStream オブジェクトを取得
+			const wstream = await fh.createWritable();
+			// WritableStreamDefaultWriter オブジェクトを取得
+			const writer = wstream.getWriter();
+
+			// テキストを書き込む
+			for(let i = 0; i < 100; i++) {
+				await writer.write(`Hello, World! ${i}\n`);
 			}
-		});
 
-		// WritableStreamDefaultWriterを生成
-		const writableStreamDefaultWriter = writableStream.getWriter();
-
-		// テキストをストリームに追加
-		addTextButton.addEventListener('click', () => {
-			const text = addTextInput.value;
-			addTextInput.value = '';
-			writableStreamDefaultWriter.write(text);
-		});
-
+			// ストリームを閉じる
+			await writer.close();
+		}
 
 
 

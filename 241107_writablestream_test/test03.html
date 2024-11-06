@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Stream API Test</title>
+</head>
+<body>
+  <button id="startDownload">ダウンロード開始</button>
+</body>
+<script>
+  const startDownload = document.getElementById('startDownload');
+  startDownload.addEventListener('click', async () => {
+    // ディレクトリハンドルの取得
+    let dirHandle = await window.showDirectoryPicker()
+
+    // 「test.text」ファイルの作成
+    let fileHandle = await dirHandle.getFileHandle('test.txt', { create: true })
+
+    // 書き込みストリームの取得
+    let writableStream = await fileHandle.createWritable()
+
+    // 1GBずつ 10回書き込み
+    for (let i = 0; i < 10; i++) {
+      let buffer = new Uint8Array(1024 * 1024 * 1024)
+      await writableStream.write(buffer)
+    }
+
+    // ストリームを閉じる
+    await writableStream.close()
+
+    console.log('書き込み完了')
+    
+  });
+</html>
