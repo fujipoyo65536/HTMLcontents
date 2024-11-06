@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>test02</title>
+</head>
+
+<body>
+
+	<script>
+		async function downloadLargeFile() {
+			// WritableStreamでファイルデータを段階的に生成
+			const stream = new WritableStream({
+				start(controller) {
+					console.log('Stream started');
+				},
+				async write(chunk, controller) {
+					// 必要に応じてデータを生成して書き込みます
+					await new Promise(resolve => setTimeout(resolve, 0)); // 非同期での処理
+					console.log('Chunk written:', chunk);
+				},
+				close() {
+					console.log('Stream closed');
+				},
+				abort(err) {
+					console.error('Stream aborted:', err);
+				}
+			});
+
+			// File Stream APIでダウンロードリンクを作成
+			const readableStream = new ReadableStream({
+				async start(controller) {
+					const chunkSize = 1024 * 1024; // 1MB
+					const totalSize = 1024 * 1024 * 1024 * 10; // 10GB
+
+					let bytesGenerated = 0;
+
+					while (bytesGenerated < totalSize) { // チャンクごとにデータを生成し、ストリームにプッシュ
+						const chunk=new Uint8Array(chunkSize);
+						controller.enqueue(chunk);
+						bytesGenerated += chunkSize;
+						await new Promise(resolve => setTimeout(resolve, 0)); //メインスレッドをブロックしない
+					}
+
+					controller.close();
+				}
+			});
+
+			// Blobとしてダウンロード
+			const blob = new Blob([readableStream], { type: 'application/octet-stream' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = 'largefile.bin';
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+		}
+	</script>
+
+</body>
+
+</html>
