@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Stream API + Response test</title>
+</head>
+
+<body>
+	<button id="downloadStartButton">ダウンロード開始</button>
+	<script>
+		async function downloadLargeFile() {
+			// データを逐次生成するTransformStreamを作成
+			const { readable, writable } = new TransformStream();
+
+			// データ生成の書き込みを行う非同期処理
+			const writer = writable.getWriter();
+			const chunkSize = 1024 * 1024 * 256; // 256MB
+			const totalSize = 1024 * 1024 * 1024 * 10; // 10GB (例)
+
+			let bytesGenerated = 0;
+
+			async function generateData() {
+				while (bytesGenerated < totalSize) {
+					// チャンク単位でデータを生成し、ストリームに書き込む
+					const chunk = new Uint8Array(chunkSize);
+					for (let i = 0; i < chunkSize; i++) {
+						chunk[i] = Math.floor(Math.random() * 256); // ダミーデータの生成
+					}
+					await writer.write(chunk);
+					bytesGenerated += chunkSize;
+
+					// 1秒待機
+					console.log("Bytes generated:", bytesGenerated , "Total size:", totalSize);
+					await new Promise(resolve => setTimeout(resolve, 1000));
+
+					// // ブラウザに制御を戻すため、少し待機
+					// await new Promise(resolve => setTimeout(resolve, 0));
+				}
+				writer.close();
+			}
+
+			// ダウンロード用リンクの作成
+			const downloadStream = new Response(readable);
+			const url = URL.createObjectURL(await downloadStream.blob());
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = 'largefile.bin';
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+
+			// データ生成開始
+			generateData().catch(console.error);
+		}
+
+	</script>
+</body>
+
+</html>
