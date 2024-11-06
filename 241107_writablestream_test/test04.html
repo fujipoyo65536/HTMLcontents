@@ -10,6 +10,9 @@
 <body>
 	<button id="downloadStartButton">ダウンロード開始</button>
 	<script>
+		const downloadStartButton = document.getElementById('downloadStartButton');
+		downloadStartButton.addEventListener('click', downloadLargeFile);
+
 		async function downloadLargeFile() {
 			// データを逐次生成するTransformStreamを作成
 			const { readable, writable } = new TransformStream();
