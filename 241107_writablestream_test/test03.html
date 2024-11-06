@@ -23,6 +23,9 @@
       for (let i = 0; i < 10; i++) {
         let buffer = new Uint8Array(1024 * 1024 * 1024)
         await writableStream.write(buffer)
+        console.log('1GB書き込み完了')
+        // 1秒待機
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
 
       // ストリームを閉じる
