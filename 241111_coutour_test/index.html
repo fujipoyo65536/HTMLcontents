@@ -46,6 +46,11 @@
       const size = Number(document.getElementById('sizeInput').value);
       const contourPitch = Number(document.getElementById('pitchInput').value);
 
+      //cadCanvasSvgを空にする
+      while (cadCanvasSvg.firstChild) {
+        cadCanvasSvg.removeChild(cadCanvasSvg.firstChild);
+      }
+
       //とりあえず地理院タイルを取得
 
       // 多摩湖付近
