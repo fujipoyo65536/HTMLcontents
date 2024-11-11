@@ -4,13 +4,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conter test</title>
+  <title>Contour test</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
   <div id="header">
-    <h1>Conter test</h1>
+    <h1>Contour test</h1>
   </div>
   <div id="top">
     zoom<input type="number" id="zoomInput" value="15">
@@ -28,7 +28,7 @@
     </div>
   </div>
   <div id="footer">
-    Conter test
+    Contour test
   </div>
 
   <script>
@@ -146,13 +146,13 @@
       }
 
 
-      // conter生成
+      // contour生成
       console.log("makeContourLines start");
-      let conterPaths = makeConterLines(dem, contourPitch);
+      let contourPaths = makeContourLines(dem, contourPitch);
       // 描画
-      for (let [z, val] of Object.entries(conterPaths)) {
-        if (conterPaths[z] === undefined) continue;
-        const paths = conterPaths[z];
+      for (let [z, val] of Object.entries(contourPaths)) {
+        if (contourPaths[z] === undefined) continue;
+        const paths = contourPaths[z];
         for (let i = 0; i < paths.length; i++) {
           if (z % 10 == 0) {
             drawLine(paths[i], { color: "black", strokeWidth: 2, offsetX: 0.5, offsetY: 0.5 });
@@ -223,13 +223,13 @@
           }
         }
       }
-      // makeConterLines(testdem);
+      // makeContourLines(testdem);
     }
     async function getGSIdem(z, x, y, size) {
       const resolution = 256;
       const dem = [];
-      for(xOffset=0; xOffset<size; xOffset++){
-        for(yOffset=0; yOffset<size; yOffset++){
+      for(xOffset=0; xOffset<size; xOffset++){ // 列
+        for(yOffset=0; yOffset<size; yOffset++){ // 行
           const url = `https://cyberjapandata.gsi.go.jp/xyz/dem5a/${z}/${x+xOffset}/${y+yOffset}.txt`;
           console.log("dem fetch start:",url);
           const res = await fetch(url)
@@ -249,10 +249,10 @@
               demLine.push(value);
             }
             if (demLine.length > 1) {
-              if(dem[xOffset*resolution+i] === undefined){
-                dem[xOffset*resolution+i] = [];
+              if(dem[yOffset*resolution+i] === undefined){
+                dem[yOffset*resolution+i] = [];
               }
-              dem[xOffset*resolution+i] = [...dem[xOffset*resolution+i], ...demLine];
+              dem[yOffset*resolution+i] = [...dem[yOffset*resolution+i], ...demLine];
             }
           }
         }
@@ -267,9 +267,9 @@
       return URL.createObjectURL(image);
     }
 
-    function makeConterLines(dem, pitch) {
+    function makeContourLines(dem, pitch) {
       // すべての行・列を走査し、1m刻みの点を生成
-      const conterPoints = [];
+      const contourPoints = [];
       for (let row = 0; row < dem.length; row++) {
         for (let col = 0; col < dem[row].length; col++) {
           //1つ右の点との間にある点を生成
@@ -283,16 +283,16 @@
                 const x = col + (z - p1z) / (p2z - p1z);
                 const y = row;
                 const type = 'x';
-                if (conterPoints[z] === undefined) {
-                  conterPoints[z] = [];
+                if (contourPoints[z] === undefined) {
+                  contourPoints[z] = [];
                 }
-                if (conterPoints[z][col] === undefined) {
-                  conterPoints[z][col] = [];
+                if (contourPoints[z][col] === undefined) {
+                  contourPoints[z][col] = [];
                 }
-                if (conterPoints[z][col][row] === undefined) {
-                  conterPoints[z][col][row] = [];
+                if (contourPoints[z][col][row] === undefined) {
+                  contourPoints[z][col][row] = [];
                 }
-                conterPoints[z][col][row][type] = { x: x, y: y, z: z };
+                contourPoints[z][col][row][type] = { x: x, y: y, z: z };
               }
             }
           }
@@ -307,28 +307,28 @@
                 const x = col;
                 const y = row + (z - p1z) / (p2z - p1z);
                 const type = 'y';
-                if (conterPoints[z] === undefined) {
-                  conterPoints[z] = [];
+                if (contourPoints[z] === undefined) {
+                  contourPoints[z] = [];
                 }
-                if (conterPoints[z][col] === undefined) {
-                  conterPoints[z][col] = [];
+                if (contourPoints[z][col] === undefined) {
+                  contourPoints[z][col] = [];
                 }
-                if (conterPoints[z][col][row] === undefined) {
-                  conterPoints[z][col][row] = [];
+                if (contourPoints[z][col][row] === undefined) {
+                  contourPoints[z][col][row] = [];
                 }
-                conterPoints[z][col][row][type] = { x: x, y: y, z: z };
+                contourPoints[z][col][row][type] = { x: x, y: y, z: z };
               }
             }
           }
         }
       }
-      // console.log(conterPoints);
+      // console.log(contourPoints);
 
-      // conterPointsを描画(デバッグ用)
+      // contourPointsを描画(デバッグ用)
       if (false) {
-        for (let z = 0; z < conterPoints.length; z++) {
-          if (conterPoints[z] === undefined) continue;
-          const pointsZ = conterPoints[z];
+        for (let z = 0; z < contourPoints.length; z++) {
+          if (contourPoints[z] === undefined) continue;
+          const pointsZ = contourPoints[z];
           for (let col = 0; col < pointsZ.length; col++) {
             if (!pointsZ[col]) continue;
             const pointsCol = pointsZ[col];
@@ -381,14 +381,14 @@
 
 
 
-      const conterPaths = [];
+      const contourPaths = [];
 
       if (true) {
         //すべての線を走査し、線をつなげる
-        for ([z, val] of Object.entries(conterPoints)) {
-          if (conterPoints[z] === undefined) continue;
-          const pointsZ = conterPoints[z];
-          conterPaths[z] = [];
+        for ([z, val] of Object.entries(contourPoints)) {
+          if (contourPoints[z] === undefined) continue;
+          const pointsZ = contourPoints[z];
+          contourPaths[z] = [];
           for (let col = 0; col < dem[0].length; col++) {
             for (let row = 0; row < dem.length; row++) {
               // 4辺を走査
@@ -399,33 +399,33 @@
 
               //全方位に点があるパターン
               if (x1 && y1 && x2 && y2) {
-                conterPaths[z].push([x1, y2]);
-                conterPaths[z].push([y1, x2]);
+                contourPaths[z].push([x1, y2]);
+                contourPaths[z].push([y1, x2]);
               } else
                 //以下いろいろなパターン
                 // ＼
                 if (x1 && y2) {
-                  conterPaths[z].push([x1, y2]);
+                  contourPaths[z].push([x1, y2]);
                 } else
                   // ／
                   if (x1 && y1) {
-                    conterPaths[z].push([x1, y1]);
+                    contourPaths[z].push([x1, y1]);
                   } else
                     // |
                     if (x1 && x2) {
-                      conterPaths[z].push([x1, x2]);
+                      contourPaths[z].push([x1, x2]);
                     } else
                       // ＼
                       if (y1 && x2) {
-                        conterPaths[z].push([y1, x2]);
+                        contourPaths[z].push([y1, x2]);
                       } else
                         // －
                         if (y1 && y2) {
-                          conterPaths[z].push([y1, y2]);
+                          contourPaths[z].push([y1, y2]);
                         } else
                           // ／
                           if (x2 && y2) {
-                            conterPaths[z].push([x2, y2]);
+                            contourPaths[z].push([x2, y2]);
                           }
 
             }//row
@@ -433,7 +433,7 @@
         }
       }
 
-      return conterPaths;
+      return contourPaths;
     }
 
     function drawPath(points, options = {}) {
