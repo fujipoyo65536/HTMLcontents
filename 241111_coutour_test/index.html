@@ -134,8 +134,8 @@
       for(xOffset=0; xOffset<size; xOffset++){
         for(yOffset=0; yOffset<size; yOffset++){
             const png = await getGSIpng(z, x, y);
-            image.setAttribute('x', 0);
-            image.setAttribute('y', 0);
+            image.setAttribute('x', xOffset*256 * cad.scale);
+            image.setAttribute('y', yOffset*256 * cad.scale);
             image.setAttribute('width', 256 * cad.scale);
             image.setAttribute('height', 256 * cad.scale);
             image.setAttribute('href', png);
