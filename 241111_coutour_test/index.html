@@ -13,7 +13,7 @@
     <h1>Conter test</h1>
   </div>
   <div id="top">
-    zoom<input type="number" id="zoomInput">
+    zoom<input type="number" id="zoomInput" value="15">
     X<input type="number" id="tileXinput" value="29092">
     Y<input type="number" id="tileYinput" value="12946">
     size<input type="number" id="sizeInput" value="1">
@@ -89,8 +89,8 @@
       // const y = 6400;
 
 
-      const dem = await getGSIdem(z, x, y);
-      // console.log(dem);
+      const dem = await getGSIdem(z, x, y,size);
+      console.log("dem:",dem);
 
       // demの点をすべて描画
       if (false) {
@@ -212,27 +212,37 @@
       }
       makeConterLines(testdem);
     }
-    async function getGSIdem(z, x, y) {
-      const url = `https://cyberjapandata.gsi.go.jp/xyz/dem5a/${z}/${x}/${y}.txt`;
-      const res = await fetch(url)
-      const text = await res.text();
-      const lines = text.split('\n');
+    async function getGSIdem(z, x, y, size) {
+      const resolution = 256;
       const dem = [];
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const values = line.split(',');
-        const demLine = [];
-        for (let j = 0; j < values.length; j++) {
-          let value;
-          if (!isNaN(Number(values[j]))) {
-            value = values[j] * 1;
-          } else {
-            value = null;
+      for(xOffset=0; xOffset<size; xOffset++){
+        for(yOffset=0; yOffset<size; yOffset++){
+          const url = `https://cyberjapandata.gsi.go.jp/xyz/dem5a/${z}/${x+xOffset}/${y+yOffset}.txt`;
+          console.log("dem fetch start:",url);
+          const res = await fetch(url)
+          const text = await res.text();
+          const lines = text.split('\n');
+          const dem = [];
+          for (let i = 0; i < lines.length; i++) { // 行
+            const line = lines[i];
+            const values = line.split(',');
+            const demLine = [];
+            for (let j = 0; j < values.length; j++) { //列
+              let value;
+              if (!isNaN(Number(values[j]))) {
+                value = values[j] * 1;
+              } else {
+                value = null;
+              }
+              demLine.push(value);
+            }
+            if (demLine.length > 1) {
+              if(dem[xOffset*resolution+i] === undefined){
+                dem[xOffset*resolution+i] = [];
+              }
+              dem[xOffset*resolution+i] = [...dem[xOffset*resolution+i], ...demLine];
+            }
           }
-          demLine.push(value);
-        }
-        if (demLine.length > 1) {
-          dem.push(demLine);
         }
       }
       return dem;
