@@ -18,6 +18,7 @@
     Y<input type="number" id="tileYinput" value="12946">
     size<input type="number" id="sizeInput" value="1">
     scale<input type="number" id="scaleInput" value="5">
+    pitch<input type="number" id="pitchInput" value="1">
     <button onclick="main()">RUN</button>
   </div>
   <div id="middle">
@@ -38,11 +39,12 @@
 
     async function main() {
       const cadCanvasSvg = document.getElementById('cadCanvasSvg');
-      let x = Number(document.getElementById('tileXinput').value);
-      let y = Number(document.getElementById('tileYinput').value);
-      let z = Number(document.getElementById('zoomInput').value);
+      const x = Number(document.getElementById('tileXinput').value);
+      const y = Number(document.getElementById('tileYinput').value);
+      const z = Number(document.getElementById('zoomInput').value);
       cad.scale = Number(document.getElementById('scaleInput').value);
-      let size = Number(document.getElementById('sizeInput').value);
+      const size = Number(document.getElementById('sizeInput').value);
+      const contourPitch = Number(document.getElementById('pitchInput').value);
 
       //とりあえず地理院タイルを取得
 
@@ -121,7 +123,7 @@
       }
 
 
-      // pngを10倍に拡大して描画 デバッグ用
+      // pngを拡大して描画 デバッグ用
       if (true) {
       const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
       for(xOffset=0; xOffset<size; xOffset++){
@@ -140,7 +142,8 @@
 
 
       // conter生成
-      let conterPaths = makeConterLines(dem, 0.5);
+      console.log("makeContourLines start");
+      let conterPaths = makeConterLines(dem, contourPitch);
       // 描画
       for (let [z, val] of Object.entries(conterPaths)) {
         if (conterPaths[z] === undefined) continue;
