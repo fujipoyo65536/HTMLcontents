@@ -130,9 +130,9 @@
 
       // pngを拡大して描画 デバッグ用
       if (true) {
-      const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-      for(xOffset=0; xOffset<size; xOffset++){
-        for(yOffset=0; yOffset<size; yOffset++){
+        for(xOffset=0; xOffset<size; xOffset++){
+          for(yOffset=0; yOffset<size; yOffset++){
+            const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
             const png = await getGSIpng(z, x, y);
             image.setAttribute('x', xOffset*256 * cad.scale);
             image.setAttribute('y', yOffset*256 * cad.scale);
