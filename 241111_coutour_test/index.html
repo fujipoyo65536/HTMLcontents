@@ -134,7 +134,7 @@
         for(xOffset=0; xOffset<size; xOffset++){
           for(yOffset=0; yOffset<size; yOffset++){
             const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-            const png = await getGSIpng(z, x, y);
+            const png = await getGSIpng(z, x+xOffset, y+yOffset);
             image.setAttribute('x', xOffset*256 * cad.scale);
             image.setAttribute('y', yOffset*256 * cad.scale);
             image.setAttribute('width', 256 * cad.scale);
