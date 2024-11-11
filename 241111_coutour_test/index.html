@@ -123,15 +123,19 @@
 
       // pngを10倍に拡大して描画 デバッグ用
       if (true) {
-        const png = await getGSIpng(z, x, y);
-        const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-        image.setAttribute('x', 0);
-        image.setAttribute('y', 0);
-        image.setAttribute('width', 256 * cad.scale);
-        image.setAttribute('height', 256 * cad.scale);
-        image.setAttribute('href', png);
-        image.setAttribute('opacity', 0.8);
-        cadCanvasSvg.appendChild(image);
+      const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      for(xOffset=0; xOffset<size; xOffset++){
+        for(yOffset=0; yOffset<size; yOffset++){
+            const png = await getGSIpng(z, x, y);
+            image.setAttribute('x', 0);
+            image.setAttribute('y', 0);
+            image.setAttribute('width', 256 * cad.scale);
+            image.setAttribute('height', 256 * cad.scale);
+            image.setAttribute('href', png);
+            image.setAttribute('opacity', 0.8);
+            cadCanvasSvg.appendChild(image);
+          }
+        }
       }
 
 
@@ -151,8 +155,8 @@
       }
       return
 
-      cad.scale = 100;
-      let testdem;
+      // cad.scale = 100;
+      // let testdem;
       // testdem = [
       //   [0,2,4,8,4,2,0],
       //   [2,4,8,16,8,4,2],
@@ -179,12 +183,12 @@
       //   [69.25,69.13,69.02,68.94,68.95],
       //   [69.30,69.17,69.16,68.94,68.86]
       // ]
-      testdem = [
-        [68.68, 68.11, 68.25, 68.89, 68.55],
-        [69.23, 69.09, 69.02, 69.08, 68.95],
-        [69.25, 69.13, 69.02, 68.94, 68.95],
-        [69.30, 69.17, 69.16, 68.94, 68.86]
-      ]
+      // testdem = [
+      //   [68.68, 68.11, 68.25, 68.89, 68.55],
+      //   [69.23, 69.09, 69.02, 69.08, 68.95],
+      //   [69.25, 69.13, 69.02, 68.94, 68.95],
+      //   [69.30, 69.17, 69.16, 68.94, 68.86]
+      // ]
       // demの点をすべて描画
       if (false) {
         for (let row = 0; row < testdem.length; row++) {
@@ -211,7 +215,7 @@
           }
         }
       }
-      makeConterLines(testdem);
+      // makeConterLines(testdem);
     }
     async function getGSIdem(z, x, y, size) {
       const resolution = 256;
@@ -223,7 +227,6 @@
           const res = await fetch(url)
           const text = await res.text();
           const lines = text.split('\n');
-          const dem = [];
           for (let i = 0; i < lines.length; i++) { // 行
             const line = lines[i];
             const values = line.split(',');
@@ -369,192 +372,8 @@
 
 
 
-      // conterPointsを線に変換
-
-      // 点をつないで線にする処理
-      // ★今は一部の線が細切れになっている。
-      // function connectPoints(pointsZ,c,r,xy){
-      //   if(pointsZ[c][r][xy] == null) return null;
-      //   const path = [];
-      //   let lastPoint = null;
-      //   path.push(pointsZ[c][r][xy]);
-      //   // pointsZ[c][r][xy]=null //最初のポイントも消さずに残しておく
-      //   while(true){
-      //     // if(pointsZ[c][r][xy] == null) return null;
-      //     if(xy=='x'){ //今が横線上
-      //       //右下の線
-      //       if(pointsZ[c+1] && pointsZ[c+1][r] && pointsZ[c+1][r].y){
-      //         const point = pointsZ[c+1][r].y;
-      //         path.push(point);
-      //         lastPoint = {c:c+1,r:r,xy:'y',point:point};
-      //         pointsZ[c+1][r].y=null
-      //         c+=1
-      //         xy='y'
-      //         continue;
-      //       }
-      //       //下の線
-      //       if(pointsZ[c][r+1] && pointsZ[c][r+1].x){
-      //         const point = pointsZ[c][r+1].x;
-      //         path.push(point);
-      //         lastPoint = {c:c,r:r+1,xy:'x',point:point};
-      //         pointsZ[c][r+1].x=null
-      //         r+=1
-      //         xy='x'
-      //         continue;
-      //       }
-      //       //左下の線
-      //       if(pointsZ[c][r].y){
-      //         const point = pointsZ[c][r].y;
-      //         path.push(point);
-      //         lastPoint = {c:c,r:r,xy:'y',point:point};
-      //         pointsZ[c][r].y=null
-      //         xy='y'
-      //         continue;
-      //       }
-      //       //左上の線
-      //       if(pointsZ[c][r-1] && pointsZ[c][r-1].y){
-      //         const point = pointsZ[c][r-1].y;
-      //         path.push(point);
-      //         lastPoint = {c:c,r:r-1,xy:'y',point:point};
-      //         pointsZ[c][r-1].y=null
-      //         r-=1
-      //         xy='y'
-      //         continue;
-      //       }
-      //       //上の線
-      //       if(pointsZ[c][r-1] && pointsZ[c][r-1].x){
-      //         const point = pointsZ[c][r-1].x;
-      //         path.push(point);
-      //         lastPoint = {c:c,r:r-1,xy:'x',point:point};
-      //         pointsZ[c][r-1].x=null
-      //         r-=1
-      //         xy='x'
-      //         continue;
-      //       }
-      //       //右上の線
-      //       if(pointsZ[c+1] && pointsZ[c+1][r-1] && pointsZ[c+1][r-1].y){
-      //         const point = pointsZ[c+1][r-1].y;
-      //         path.push(point);
-      //         lastPoint = {c:c+1,r:r-1,xy:'y',point:point};
-      //         pointsZ[c+1][r-1].y=null
-      //         c+=1
-      //         r-=1
-      //         xy='y'
-      //         continue;
-      //       }
-      //       //すべて見つからなかったら
-      //       break;
-      //     }
-      //     if(xy=='y'){ //今が縦線上
-      //       //右上の線
-      //       if(pointsZ[c][r].x){
-      //         const point = pointsZ[c][r].x;
-      //         path.push(point);
-      //         lastPoint = {c:c,r:r,xy:'x',point:point};
-      //         pointsZ[c][r].x=null
-      //         xy='x'
-      //         continue;
-      //       }
-      //       //次は右の線
-      //       if(pointsZ[c+1] && pointsZ[c+1][r] && pointsZ[c+1][r].y){
-      //         const point = pointsZ[c+1][r].y;
-      //         path.push(point);
-      //         lastPoint = {c:c+1,r:r,xy:'y',point:point};
-      //         pointsZ[c+1][r].y=null
-      //         c+=1
-      //         xy='y'
-      //         continue;
-      //       }
-      //       //右下の線
-      //       if(pointsZ[c][r+1] && pointsZ[c][r+1].x){
-      //         const point = pointsZ[c][r+1].x;
-      //         path.push(point);
-      //         lastPoint = {c:c,r:r+1,xy:'x',point:point};
-      //         pointsZ[c][r+1].x=null
-      //         r+=1
-      //         xy='x'
-      //         continue;
-      //       }
-      //       //左下の線
-      //       if(pointsZ[c-1] && pointsZ[c-1][r+1] && pointsZ[c-1][r+1].x){
-      //         const point = pointsZ[c-1][r+1].x;
-      //         path.push(point);
-      //         lastPoint = {c:c-1,r:r+1,xy:'x',point:point};
-      //         pointsZ[c-1][r+1].x=null
-      //         c-=1
-      //         r+=1
-      //         xy='x'
-      //         continue;
-      //       }
-      //       //左の線
-      //       if(pointsZ[c-1] && pointsZ[c-1][r] && pointsZ[c-1][r].y){
-      //         const point = pointsZ[c-1][r].y;
-      //         path.push(point);
-      //         lastPoint = {c:c-1,r:r,xy:'y',point:point};
-      //         pointsZ[c-1][r].y=null
-      //         c-=1
-      //         xy='y'
-      //         continue;
-      //       }
-      //       //左上の線
-      //       if(pointsZ[c-1] && pointsZ[c-1][r] && pointsZ[c-1][r].x){
-      //         const point = pointsZ[c-1][r].x;
-      //         path.push(point);
-      //         lastPoint = {c:c-1,r:r,xy:'x',point:point};
-      //         pointsZ[c-1][r].x=null
-      //         c-=1
-      //         xy='x'
-      //         continue;
-      //       }
-      //       //すべて見つからなかったら
-      //       break;
-      //     }
-      //     //なぜかどっちでもなかったら
-      //     break;
-      //   }
-      //   //最後の点だけ修復しておく
-      //   if(lastPoint){
-      //     pointsZ[lastPoint.c][lastPoint.r][lastPoint.xy] = lastPoint.point;
-      //   }
-
-      //   // drawPath(path,{scale:100});
-      //   if(path.length >1){
-      //     return path;
-      //   }else{
-      //     return null;
-      //   }
-      // }
 
       const conterPaths = [];
-
-      // if(false){//実処理old
-      //   for(let z = 0; z < conterPoints.length; z++){
-      //     if(conterPoints[z] === undefined) continue;
-      //     const pointsZ = conterPoints[z];
-      //     conterPaths[z] = [];
-      //     // すべての点を走査し、連続する点を結ぶパスを生成
-      //     // スタート地点探し
-      //     for(let col = 0; col < pointsZ.length; col++){
-      //       if(!pointsZ[col]) continue;
-      //       const pointsCol = pointsZ[col];
-      //       for(let row = 0; row < pointsCol.length; row++){
-      //         if(!pointsCol[row]) continue;
-      //         const pointRow = pointsCol[row];
-      //         if(pointRow.x){// x方向の線にpointがある場合
-      //           // ここからスタートする
-      //           const path = connectPoints(pointsZ,col,row,'x');
-      //           if(path) conterPaths[z].push( path );
-      //         }
-      //         if(pointRow.y){// y方向の線にpointがある場合
-      //           // ここからスタートする
-      //           const path = connectPoints(pointsZ,col,row,'y');
-      //           if(path) conterPaths[z].push( path );
-      //         }
-      //       }//row
-      //     }//col
-      //   }
-      //   console.log(conterPaths);
-      // }
 
       if (true) {
         //すべての線を走査し、線をつなげる
