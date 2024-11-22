@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReadableStream test</title>
+</head>
+<body>]
+  60GBのファイルをダウンロードします。
+  <script>
+    // ストリーミングでデータを生成し、分割してダウンロードする関数
+      async function downloadLargeFile(filename, totalSize, chunkSize) {
+        const stream = new ReadableStream({
+          start(controller) {
+            let generatedSize = 0;
+            function push() {
+              if (generatedSize < totalSize) {
+                const chunk = new Uint8Array(chunkSize);
+                // データを生成する処理（例: ランダムデータ）
+                for (let i = 0; i < chunkSize; i++) {
+                  chunk[i] = Math.floor(Math.random() * 256);
+                }
+                controller.enqueue(chunk);
+                generatedSize += chunkSize;
+                push();
+              } else {
+                controller.close();
+              }
+            }
+            push();
+          }
+        });
+
+        const response = new Response(stream);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      // 使用例
+      downloadLargeFile('largefile.bin', 60 * 1024 * 1024 * 1024, 10 * 1024 * 1024); // 60GBファイルを10MBチャンクで生成
+  </script>
+</body>
+</html>
