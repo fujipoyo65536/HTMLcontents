@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Processor</title>
+  <link rel="stylesheet" href="csvProcessor.css">
+  <script src="csvProcessor.js"></script>
+</head>
+<body>
+  <div id="content">
+    <div id="step1" class="stepBox">
+      <h2>Step 1: 入力</h2>
+      <h3>ファイル読み込み</h3>
+      <div>
+        ファイルを選択：<input type="file" id="csvFileInput" accept=".csv"><br>
+        フォルダを選択(一括読込)：
+        <label class="optionBox">
+        <button id="inputDirectorySelectButton">フォルダを選択</button>
+        読み込み対象とする拡張子:<input type="text" id="fileExtensionInput" value=".csv" style="width: 5em;"></label><button id="directoryReloadButton">再読込</button><br>
+        内容サンプル表示：<br>
+        <textarea id="csvDataInput" rows="10" cols="50" placeholder="ここに直接入力することもできます"></textarea><br>
+      </div>
+
+      <h3>読み込みオプション</h3>
+      <div>
+        <span class="optionBox">先頭を<input type="number" id="skipRowNumberInput" value="0" style="width: 3em;">行読み飛ばす</span><br>
+        <label class="optionBox"><input type="checkbox" id="isHeaderCheckbox">ヘッダー行あり</label><br>
+        <span class="optionBox">区切り文字:<input type="text" id="delimiterInput" value="," style="width: 3em;"></span>
+        <span class="optionBox">改行文字:<select id="lineBreakInput">
+          <option value="ALL" selected>CR,LF,CRLF</option>
+          <option value="CR">CR</option>
+          <option value="LF">LF</option>
+          <option value="CRLF">CRLF</option>
+        </select></span><br>
+        <span class="optionBox">囲み文字:<input type="text" id="wrapperInput" value='"' style="width: 3em;"></span>
+        <label class="optionBox"><input type="checkbox" id="isUseDelimiterInWrapper" disabled>セル内に区切り文字を含む場合がある</label>
+        <label class="optionBox"><input type="checkbox" id="isUseWrapperInWrapper" disabled checked>セル内に囲み文字を含む場合がある</label>
+        <label class="optionBox"><input type="checkbox" id="isUseLineBreak" disabled>セル内に改行を含む場合がある</label><br>
+      </div>
+      <h3>プレビュー表示</h3>
+      <div>
+        <div id="csvPreviewBox">
+          <table id="csvPreviewTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
