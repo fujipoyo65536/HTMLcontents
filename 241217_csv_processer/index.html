@@ -13,37 +13,62 @@
       <h2>Step 1: 入力</h2>
       <h3>ファイル読み込み</h3>
       <div>
-        ファイルを選択：<input type="file" id="csvFileInput" accept=".csv"><br>
+        ファイルを選択：<input type="file" id="csvFileInput" accept=".csv" multiple><br>
         フォルダを選択(一括読込)：
+        <button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
         <label class="optionBox">
-        <button id="inputDirectorySelectButton">フォルダを選択</button>
-        読み込み対象とする拡張子:<input type="text" id="fileExtensionInput" value=".csv" style="width: 5em;"></label><button id="directoryReloadButton">再読込</button><br>
+        読み込み対象とする拡張子:<input type="text" id="fileExtensionInput" value=".csv" style="width: 5em;" disabled></label><button id="directoryReloadButton" disabled>再読込</button><br>
         内容サンプル表示：<br>
         <textarea id="csvDataInput" rows="10" cols="50" placeholder="ここに直接入力することもできます"></textarea><br>
       </div>
 
       <h3>読み込みオプション</h3>
-      <div>
-        <span class="optionBox">先頭を<input type="number" id="skipRowNumberInput" value="0" style="width: 3em;">行読み飛ばす</span><br>
-        <label class="optionBox"><input type="checkbox" id="isHeaderCheckbox">ヘッダー行あり</label><br>
-        <span class="optionBox">区切り文字:<input type="text" id="delimiterInput" value="," style="width: 3em;"></span>
+      <div id="loadingOptions">
+        プレビューを見ながら、正常に読み込まれるように設定してください。<br>
+        基本事項<span class="optionBox">区切り文字:<input type="text" id="delimiterInput" value="," style="width: 3em;"></span>
         <span class="optionBox">改行文字:<select id="lineBreakInput">
           <option value="ALL" selected>CR,LF,CRLF</option>
           <option value="CR">CR</option>
           <option value="LF">LF</option>
           <option value="CRLF">CRLF</option>
         </select></span><br>
-        <span class="optionBox">囲み文字:<input type="text" id="wrapperInput" value='"' style="width: 3em;"></span>
-        <label class="optionBox"><input type="checkbox" id="isUseDelimiterInWrapper" disabled>セル内に区切り文字を含む場合がある</label>
-        <label class="optionBox"><input type="checkbox" id="isUseWrapperInWrapper" disabled checked>セル内に囲み文字を含む場合がある</label>
-        <label class="optionBox"><input type="checkbox" id="isUseLineBreak" disabled>セル内に改行を含む場合がある</label><br>
+        行読み飛ばし関係 <span class="optionBox">先頭を<input type="number" id="skipRowNumberInput" value="0" style="width: 3em;" min="0">行読み飛ばす</span>
+        <label class="optionBox"><input type="checkbox" id="skipEmptyRowCheckbox">空の行は読み飛ばす</label><br>
+        ヘッダー行 <label class="optionBox"><input type="checkbox" id="isHeaderCheckbox">ヘッダー行あり</label>
+        <br>
+        囲み文字 <label class="optionBox"><input type="checkbox" id="isUseWrapperCheckbox" checked>囲み文字を使用している</label>
+        <span class="optionBox">囲み文字:<input type="text" id="wrapperInput" value='"' style="width: 3em;"></span><br>
+        複雑なCSV <label class="optionBox"><input type="checkbox" id="isUseLineBreakInWrapperCheckbox">セル内に改行文字を含む場合がある</label>
+        <label class="optionBox"><input type="checkbox" id="isUseDelimiterInWrapperCheckbox">セル内に区切り文字を含む場合がある</label>
+        <label class="optionBox"><input type="checkbox" id="isUseWrapperInWrapperCheckbox" checked>セル内に囲み文字を含む場合がある</label><br>
+        その他 <label class="optionBox"><input type="checkbox" id="ignoreLastLineBreakCheckbox" checked>入力末尾の改行は無視</label>
       </div>
       <h3>プレビュー表示</h3>
       <div>
+        <span class="optionBox">文字数リミット : <input type="number" id="previewCharLimitInput" value="1000" style="width: 5em;">文字</span><br>
+        <span id="readingModeView">処理モードを表示</span><!-- ★ -->
         <div id="csvPreviewBox">
           <table id="csvPreviewTable"></table>
         </div>
       </div>
+    </div>
+    <div id="step2" class="stepBox">
+      <h2>Step 2: 処理</h2>
+      対応予定機能
+      <span>カラムの値を書き換える (対象カラム設定・処理内容設定(正規表現対応)</span>
+      <span>カラムの抽出(削除)・並び替え</span>
+    </div>
+    <div id="step3" class="stepBox">
+      <h2>Step 3: 出力</h2>
+      対応予定機能
+      <span>出力ディレクトリ指定(直接書き込む)</span>
+      <span>出力ファイル名指定(自動連番対応)</span>
+      <span>抽出</span>
+      <span>振り分け(単純一致・数値大小判定・正規表現対応)</span>
+      <span>区切り文字・改行文字・ヘッダー行</span>
+      <span>行数での分割</span>
+      <span>ファイル上書きor追記</span>
+      <span>出力プレビュー</span>
     </div>
   </div>
 </body>
