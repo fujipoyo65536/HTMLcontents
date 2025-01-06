@@ -175,6 +175,7 @@
 			}
 
 			setDetect(patterns_solo,[],soloTiles2,"agari",0) //アガリパターンの割り振りはサブルーチンにて
+			console.log("patterns_solo:",patterns_solo)
 
 			results = []//添字はパターンごと
 
@@ -222,8 +223,6 @@
 					fu:0,
 				})
 			}
-
-			console.log("patterns:",results.patterns)
 
 			var score=[]
 			var l1t = tileList1Text;
