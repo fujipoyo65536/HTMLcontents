@@ -25,7 +25,7 @@
 	state:{
 		type:"tsumo", //または"ron","chankan"	,"rinshan"
 		first:false, //またはtrue 初順の場合 天和・地和・人和判定用
-		parent:false, //またはtrue 親か子か 天和・地和判定用
+		parent:false, //またはtrue 親か子か 点数計算・天和・地和判定用
 		last:false, //またはtrue 海底・河底判定用
 		reach:null //trueではないので注意 または"reach","double"
 		ippatsu:true,//またはfalse,null(立直なしの場合)
