@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>麻雀の牌符計算</title>
+	<script src="https://code.jquery.com/jquery-3.5.1.js" integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc=" crossorigin="anonymous"></script>
+	<script>
+
+		var input = {
+			// members:[
+			// 	{
+			// 		type:"solo",
+			// 		tiles:[
+			// 			"1s","2s","3s","1p","2p","3p","tx",
+			// 		]
+			// 	},
+			// 	{
+			// 		type:"chi",
+			// 		tiles:[
+			// 			"1m","2m","3m",
+			// 		]
+			// 	},
+			// 	{
+			// 		type:"h_kan",
+			// 		tiles:[
+			// 			"hx","hx","hx","hx"
+			// 		]
+			// 	},
+			// 	{
+			// 		type:"agari",
+			// 		tile:"tx",
+			// 	}
+			// ],
+			members:[ //大車輪
+				{
+					type:"solo",
+					tiles:[
+						"2p","2p","3p","3p","4p","4p","5p","5pr","6p","6p","7p","7p","8p"
+					]
+				},
+				{
+					type:"agari",
+					tile:"8p",
+				}
+			],
+			// members:[
+			// 	{
+			// 		type:"solo",
+			// 		tiles:[
+			// 			"1p","1p","1p","1s","1s","1s","cx"
+			// 		]
+			// 	},
+			// 	{
+			// 		type:"h_kan",
+			// 		tiles:["1m","1m","1m","1m"],
+			// 	},
+			// 	{
+			// 		type:"pon",
+			// 		tiles:["hx","hx","hx"],
+			// 	},
+			// 	{
+			// 		type:"agari",
+			// 		tile:"cx",
+			// 	}
+			// ],
+			state:{
+				type:"tsumo",
+				first:false,
+				parent:true,
+				last:false,
+				reach:null,
+				ippatsu:true,
+				tsubame:false,
+				kanburi:false,
+				nagashi:true,
+				dora:[
+					["1p"],
+					["1s"],
+					0
+				],
+				kaze:[
+					0,0
+				]
+			}
+		}
+
+
+		function calcHanFu(input){
+			var debugText = "";//★
+
+			// var gen={} //★
+
+			// ●tileList生成
+			var tileList1=[]; //純粋な牌リスト
+			var tileList2=[]; //上記からカン牌の4枚目を除いたもの
+			for (var key in input.members) {
+				var val = input.members[key];
+				if(val.type=="agari"){
+					tileList1 = tileList1.concat([val.tile]);
+					tileList2 = tileList2.concat([val.tile]);
+				}else{
+					tileList1 = tileList1.concat(val.tiles);
+					tileList2 = tileList2.concat(val.tiles);
+					if(val.type.match(/kan/)){tileList2.pop()}; //カン牌の4枚目をリストから除去
+				}
+			}
+
+			var tileList1Text = tileList1.join(",");
+			var tileList2Text = tileList2.join(",");
+
+			console.log("tileList1:",tileList1); //★
+			console.log("tileList2:",tileList2); //★
+			// debugText += "tileList1Text:" + tileList1Text + "<br>"
+			// debugText += "tileList2Text:" + tileList2Text + "<br>"
+			debugText += "アガリ時の牌:" + tileList1Text + "<br>"
+
+
+			if(tileList2.length<14 && !input.state.nagashi){
+				return {type:"error",message:"少牌"};
+			}
+			if(tileList2.length>14){
+				return {type:"error",message:"多牌"};
+			}
+
+			// ●面子を判定するロジック
+			var baseSet = [] //ソロ牌以外
+			var soloTiles = [] //ソロ牌
+			for (var key in input.members) {
+				var val = input.members[key];
+				switch(val.type){
+					case "solo":
+						soloTiles = soloTiles.concat(val.tiles)
+						break;
+					case "agari":
+						soloTiles = soloTiles.concat([val.tile])
+						break;
+					default:
+						baseSet = baseSet.concat(val)
+						break;
+				}
+			}
+			console.log("baseSet:" , baseSet)
+			console.log("soloTiles:" , soloTiles)
+
+
+			//ここからソロ牌の割り振り(再帰処理)
+			//牌を3・3・3・3・2に分けていく処理
+
+			var patterns = [] //アガリパターン
+			var patterns_solo = [] //アガリパターン(ソロ牌のみ)
+
+			var soloTiles2 = [] //赤などを削除したもの
+			for(var i in soloTiles){
+				soloTiles2.push(soloTiles[i].substr(0,2))
+			}
+
+			setDetect(patterns_solo,[],soloTiles2,"agari",0) //アガリパターンの割り振りはサブルーチンにて
+
+			results = []//添字はパターンごと
+
+			for(i in patterns_solo){
+				var pattern = patterns_solo[i].concat(baseSet)
+				if(pattern.length!=5 && pattern.length!=7)continue; //面子が5か7じゃないパターンをここで除去
+
+				var patternText = "";
+				for(var i in pattern){
+					var set = pattern[i]
+					switch(set.type){
+						case "pon": //ポン
+							patternText += "p_" + set.tiles[0] + ","
+							break;
+						case "chi": //チー
+							patternText += "c_" + set.tiles[0] + ","
+							break;
+						case "h_kan": //暗槓
+							patternText += "hk_" + set.tiles[0] + ","
+							break;
+						case "l_kan": //大明槓
+							patternText += "lk_" + set.tiles[0] + ","
+							break;
+						case "k_kan": //加槓
+							patternText += "kk_" + set.tiles[0] + ","
+							break;
+						case "jun": //暗順
+							patternText += "j_" + set.tiles[0] + ","
+							break;
+						case "anko": //暗刻
+							patternText += "a_" + set.tiles[0] + ","
+							break;
+						case "toi": //対子・雀頭
+							patternText += "t_" + set.tiles[0] + ","
+							break;
+					}
+				}
+
+
+				results.push({
+					pattern:pattern,
+					patternText:patternText,
+					yakus:[],
+					han:0,
+					fu:0,
+				})
+			}
+
+			console.log("patterns:",results.patterns)
+
+			var score=[]
+			var l1t = tileList1Text;
+			//tmpに和了牌を代入
+			for(i in input.members){
+				if(input.members[i].type!="agari")continue;
+				var agariTile=input.members[i].tile
+			}
+
+			// ●この下に成立している役の判定
+
+			// 以下に(一部そのうち)実装予定の役を記載。とりあえず天鳳と雀魂にあるものを網羅。
+
+			// 特殊なアガリ(アガリ判定で出てこない 成立していればこの時点でreturn★)
+			// ・国士無双
+			// ・流し満貫
+
+			// ・以後、アガリ形の数だけループ
+			for(i in results){
+				var r = results[i];
+				var p = r.pattern;
+				var y = r.yakus;
+				var h = r.han;
+				var f = r.fu;
+				var pt = r.patternText;
+				var l = true; //ローカル役★暫定的にON固定
+
+
+
+
+				// 役満(以後の判定を行わない)
+				// ・天和
+				if( input.state.first && input.state.type=="tsumo" && input.state.parent==true){
+					y.push({name:"天鳳",yakuman:1});
+				}
+				// ・地和
+				if( input.state.first && input.state.type=="tsumo" && input.state.parent==false){
+					y.push({name:"地和",yakuman:1});
+				}
+				// ・人和(ローカル)
+				if( l&& input.state.first && input.state.type=="ron" ){
+					y.push({name:"人和",yakuman:1});
+				}
+				// ・大三元
+				if( pt.match(/[pka]_[hrc]x/)&&pt.match(/[pka]_[hrc]x/g).length==3 ){//三元牌の刻子が3つ
+					y.push({name:"大三元",yakuman:1});
+				}
+
+				// ・四槓子
+				if( pt.match(/k_/)&&pt.match(/k_/g).length==4 ){//四槓子
+					y.push({name:"四槓子",yakuman:1});
+				}
+
+				// ・四暗刻・四暗刻単騎(◆ダブル) ★単騎待ち判定ができてない
+				if( pt.match(/(hk|a)_/)&&pt.match(/(hk|a)_/g).length==4 && false){//四暗刻
+					y.push({name:"四暗刻単騎待ち",yakuman:2});
+				}else if( pt.match(/(hk|a)_/)&&pt.match(/(hk|a)_/g).length==4 ){//四暗刻
+					y.push({name:"四暗刻",yakuman:1});
+				}
+				// ・字一色(◆七対子形OK)
+				if( !l1t.match(/[1-9][mps]/) ){//数牌を含まない
+					y.push({name:"字一色",yakuman:1});
+				}
+				// ・緑一色(◆発なしOK)
+				if( !l1t.match(/([1-9][mp]|[1579]s|[tnsp]x|[hc]x)/) ){//萬子と筒子・1579s・風牌・白と中を含まない
+					y.push({name:"緑一色",yakuman:1});
+				}
+				// ・清老頭
+				if( !l1t.match(/[2-7][mps]|x/) ){//2-7の数牌と字牌を含まない
+					y.push({name:"清老頭",yakuman:1});
+				}
+				// 大四喜(◆ダブル)
+				if( pt.match(/[pka]_[tnsp]x/) && pt.match(/[pka]_[tnsp]x/g).length==4 ){//風牌の刻子が4つ
+					y.push({name:"大四喜",yakuman:2});
+				}
+				// ・小四喜
+				if(
+						( pt.match(/[pka]_[tnsp]x/) && pt.match(/[pka]_[tnsp]x/g).length==3 ) && //風牌の刻子が3つ かつ
+						pt.match(/t_[tnsp]x/)//三元牌の対子が1つ
+				){
+					y.push({name:"小四喜",yakuman:1});
+				}
+
+				// ・国士無双(特殊形)・国士無双十三面待ち(特殊形・◆ダブル)
+				// ★処理順が定まらないので保留
+
+
+				// ・九蓮宝燈・純正九蓮宝燈(◆ダブル ◆暗槓NG)
+				if(
+					(
+						l1t.match(/1m/)&&l1t.match(/1m/g).length>=3 && l1t.match(/9m/)&&l1t.match(/9m/g).length>=3 && //1m,9mが3枚以上 かつ
+						l1t.match(/2m/)&&l1t.match(/3m/)&&l1t.match(/4m/)&&l1t.match(/5m/)&&l1t.match(/6m/)&&l1t.match(/7m/) &&l1t.match(/8m/) //2345678mが含まれる
+					)|| //または
+					(
+						l1t.match(/1p/)&&l1t.match(/1p/g).length>=3 && l1t.match(/9p/)&&l1t.match(/9p/g).length>=3 && //1p,9pが3枚以上 かつ
+						l1t.match(/2p/)&&l1t.match(/3p/)&&l1t.match(/4p/)&&l1t.match(/5p/)&&l1t.match(/6p/)&&l1t.match(/7p/) &&l1t.match(/8p/) //2345678pが含まれる
+					)|| //または
+					(
+						l1t.match(/1s/)&&l1t.match(/1s/g).length>=3 && l1t.match(/9s/)&&l1t.match(/9s/g).length>=3 && //1s,9sが3枚以上 かつ
+						l1t.match(/2s/)&&l1t.match(/3s/)&&l1t.match(/4s/)&&l1t.match(/5s/)&&l1t.match(/6s/)&&l1t.match(/7s/) &&l1t.match(/8s/) //2345678sが含まれる
+					)
+				){//九蓮宝燈成立
+					//ここで単騎待ちの分岐★未実装
+					if(false){
+						y.push({name:"純正九蓮宝燈",yakuman:2});
+					}else{
+						y.push({name:"九蓮宝燈",yakuman:1});
+					}
+				}
+				// ・大数隣・大竹林・大車輪(ローカル)
+				// 七対子形として評価するバージョン。軽量だがどこかで支障ありそう
+				/*
+				if( l&& pt.match(/t_2m/),pt.match(/t_3m/),pt.match(/t_4m/),pt.match(/t_5m/),pt.match(/t_6m/),pt.match(/t_7m/),pt.match(/t_8m/)){//2m-7mの七対子形
+					y.push({name:"大数隣",yakuman:1});
+				}
+				if( l&& pt.match(/t_2p/),pt.match(/t_3p/),pt.match(/t_4p/),pt.match(/t_5p/),pt.match(/t_6p/),pt.match(/t_7p/),pt.match(/t_8p/)){//2p-7pの七対子形
+					y.push({name:"大車輪",yakuman:1});
+				}
+				if( l&& pt.match(/t_2s/),pt.match(/t_3s/),pt.match(/t_4s/),pt.match(/t_5s/),pt.match(/t_6s/),pt.match(/t_7s/),pt.match(/t_8s/)){//2s-7sの七対子形
+					y.push({name:"大竹林",yakuman:1});
+				}
+				*/
+				//七対子じゃなくてもいけるバージョン
+				// ・大数隣
+				if(
+					l&&
+					l1t.match(/2m/)&&l1t.match(/2m/g).length==2 && //2mが2枚
+					l1t.match(/3m/)&&l1t.match(/3m/g).length==2 && //3mが2枚
+					l1t.match(/4m/)&&l1t.match(/4m/g).length==2 && //4mが2枚
+					l1t.match(/5m/)&&l1t.match(/5m/g).length==2 && //5mが2枚
+					l1t.match(/6m/)&&l1t.match(/6m/g).length==2 && //6mが2枚
+					l1t.match(/7m/)&&l1t.match(/7m/g).length==2 && //7mが2枚
+					l1t.match(/8m/)&&l1t.match(/8m/g).length==2//8mが2枚
+				){
+					y.push({name:"大数隣",yakuman:1});
+				}
+				// ・大車輪
+				if(
+					l&&
+					l1t.match(/2p/)&&l1t.match(/2p/g).length==2 && //2pが2枚
+					l1t.match(/3p/)&&l1t.match(/3p/g).length==2 && //3pが2枚
+					l1t.match(/4p/)&&l1t.match(/4p/g).length==2 && //4pが2枚
+					l1t.match(/5p/)&&l1t.match(/5p/g).length==2 && //5pが2枚
+					l1t.match(/6p/)&&l1t.match(/6p/g).length==2 && //6pが2枚
+					l1t.match(/7p/)&&l1t.match(/7p/g).length==2 && //7pが2枚
+					l1t.match(/8p/)&&l1t.match(/8p/g).length==2//8pが2枚
+				){
+					y.push({name:"大車輪",yakuman:1});
+				}
+				// ・大竹林
+				if(
+					l&&
+					l1t.match(/2s/)&&l1t.match(/2s/g).length==2 && //2sが2枚
+					l1t.match(/3s/)&&l1t.match(/3s/g).length==2 && //3sが2枚
+					l1t.match(/4s/)&&l1t.match(/4s/g).length==2 && //4sが2枚
+					l1t.match(/5s/)&&l1t.match(/5s/g).length==2 && //5sが2枚
+					l1t.match(/6s/)&&l1t.match(/6s/g).length==2 && //6sが2枚
+					l1t.match(/7s/)&&l1t.match(/7s/g).length==2 && //7sが2枚
+					l1t.match(/8s/)&&l1t.match(/8s/g).length==2//8sが2枚
+				){
+					y.push({name:"大竹林",yakuman:1});
+				}
+
+				// ・大七星(ローカル・七対子形・◆ダブル)
+				if( l&& pt.match(/t_tx/) && pt.match(/t_nx/) && pt.match(/t_sx/) && pt.match(/t_px/) && pt.match(/t_hx/) && pt.match(/t_rx/) && pt.match(/t_cx/)){//東南西北白発中の七対子形
+					y.push({name:"大七星",yakuman:1});
+				}
+				// ・石の上にも三年(ローカル)
+				if( input.state.reach=="double" && input.state.last){
+					y.push({name:"石の上にも三年",yakuman:1});
+				}
+
+				//★七対子のときは以後の処理を行わない
+
+				// アガリ方によるもの等
+				// ・立直・ダブル立直
+				if( input.state.reach=="reach" ){
+					y.push({name:"立直",han:[1,0]});
+				}
+				if( input.state.reach=="double" ){
+					y.push({name:"両立直",han:[2,0]});
+				}
+				// ・一発
+				if( input.state.ippatsu==true ){
+					y.push({name:"一発",han:[1,0]});
+				}
+				// ・門前清自摸和
+				if(input.state.type=="tsumo" && !pt.match(/(p|c|lk|kk)_/)){ //ツモ和了 かつ ポン・チー・明槓を含まない
+					y.push({name:"門前清自摸和",han:[1,0]});
+				}
+				// ・ドラ
+				var tmp=0
+				for(j in input.state.dora[0]){
+					tmp += l1t.match(input.state.dora[0][j])
+				}
+				if(tmp>0){
+					y.push({name:"ドラ×"+tmp,han:[tmp,tmp]});
+				}
+				// ・裏ドラ
+				var tmp=0
+				for(j in input.state.dora[1]){
+					tmp += l1t.match(input.state.dora[1][j])
+				}
+				if(tmp>0 && input.state.reach!=null){//立直済みの場合のみ
+					y.push({name:"裏ドラ×"+tmp,han:[tmp,0]});
+				}
+				//抜きドラ
+				if(input.state.dora[2]>0){
+					y.push({name:"抜きドラ×"+input.state.dora[2] , han:[ input.state.dora[2] , input.state.dora[2] ]});
+				}
+				//赤ドラ
+				var tmp=l1t.match(/5[pms]r/)
+				if(tmp){
+					y.push({name:"赤ドラ×"+tmp.length,han:[tmp.length,tmp.length]});
+				}
+				// ・槍槓(◆一発とは複合する)
+				if(input.state.type=="chankan"){ //槍槓和了
+					y.push({name:"槍槓",han:[1,1]});
+				}
+				// ・嶺上開花(◆一発・槍槓との複合なし)
+				if(input.state.type=="rinshan" && input.state.ippatsu==false){ //嶺上開花和了
+					y.push({name:"嶺上開花",han:[1,1]});
+				}
+				// ・海底
+				if(input.state.last && input.state.type=="tsumo"){ //最終牌で和了 かつ ツモ和了
+					y.push({name:"海底摸月",han:[1,0]});
+				}
+				// ・河底
+				if(input.state.last && input.state.type=="ron"){ //最終牌で和了 かつ ロン和了
+					y.push({name:"河底撈魚",han:[1,1]});
+				}
+				// ・燕返し(ローカル)
+				if(l&& input.state.tsubame && input.state.type=="ron"){ //最終牌で和了 かつ ロン和了
+					y.push({name:"燕返し",han:[1,1]});
+				}
+				// ・槓振り(ローカル)
+				if(l&& input.state.kanburi && input.state.type=="ron"){ //最終牌で和了 かつ ロン和了
+					y.push({name:"槓振り",han:[1,1]});
+				}
+				// ・一筒摸月(ローカル)
+				if(l&& input.state.last && input.state.type=="tsumo" && agariTile.match("1p")){ //最終牌で和了 かつ ツモ和了
+					y.push({name:"海底摸月",han:[1,0]});
+				}
+				// ・九筒撈魚(ローカル)
+				if(l&& input.state.last && input.state.type=="ron" && agariTile.match("9p")){ //最終牌で和了 かつ ロン和了
+					y.push({name:"河底撈魚",han:[1,1]});
+				}
+
+				// 特殊な形(以後の判定を行わない)
+				// ・七対子(◆4枚持ちNG)
+				if( p.length==7 ){
+					y.push({name:"七対子",han:[2,2]});
+				}
+				//★七対子のときは以後の処理を行わない
+
+				// 牌姿での判定
+				// ・自風牌(門風牌)
+				if( pt.match( [/[pka]_tx/,/[pka]_nx/,/[pka]_sx/,/[pka]_hx/][input.state.kaze[0]] ) ){
+					y.push({name:"場風牌 "+["東","南","西","北"][input.state.kaze[0]] ,han:[1,1]});
+				}
+				if( pt.match( [/[pka]_tx/,/[pka]_nx/,/[pka]_sx/,/[pka]_hx/][input.state.kaze[1]] ) ){
+					y.push({name:"自風牌 "+["東","南","西","北"][input.state.kaze[1]] ,han:[1,1]});
+				}
+
+				// ・場風牌
+				// ・三元牌
+				if( pt.match(/[pka]_hx/) ){//白の刻子を含む
+					y.push({name:"三元牌 白",han:[1,1]});
+				}
+				if( pt.match(/[pka]_rx/) ){//発の刻子を含む
+					y.push({name:"三元牌 発",han:[1,1]});
+				}
+				if( pt.match(/[pka]_cx/) ){//中の刻子を含む
+					y.push({name:"三元牌 中",han:[1,1]});
+				}
+				// ・断么九
+				if( !l1t.match(/[x19]/) ){//么九牌を含む
+					y.push({name:"断么九",han:[1,1]});
+				}
+				// ・対々和
+				if( pt.match(/[pka]_/)&&pt.match(/[pka]_/g).length==4){//刻子が4つ存在
+					y.push({name:"対々和",han:[2,2]});
+				}
+				// ・三暗刻
+				if( pt.match(/(a|hk)_/)&&pt.match(/(a|hk)_/g).length==3){//暗子が3つ存在
+					y.push({name:"三暗刻",han:[2,2]});
+				}
+				// ・小三元
+				if(
+					pt.match(/[pka]_[hrc]x/)&&pt.match(/[pka]_[hrc]x/g).length==2 && //三元牌の刻子が2つ and
+					pt.match(/t_[hrc]x/)//三元牌の対子が1つ
+				 ){
+					y.push({name:"小三元",han:[2,2]});
+				}
+				// ・混老頭
+				if( !l1t.match(/[2-8]/) ){ //2-8の牌を含まない
+					y.push({name:"混老頭",han:[2,2]});
+				}
+				// ・混全帯么九
+				if( !pt.match(/([cj]_[2-6]|[pkat]_[2-8])/) && pt.match(/[cj]_/) ){//234～678の順子・2-8の刻子・雀頭を含まない かつ なんらかの順子を含む(含まないと混老頭)
+					y.push({name:"混全帯么九",han:[2,1]});
+				}
+				// ・一気通貫
+				if(
+					(pt.match(/[cj]_1m/) && pt.match(/[cj]_4m/) && pt.match(/[cj]_7m/))||//123m・456m・789mがそれぞれ存在 または
+					(pt.match(/[cj]_1p/) && pt.match(/[cj]_4p/) && pt.match(/[cj]_7p/))||//123p・456p・789pがそれぞれ存在 または
+					(pt.match(/[cj]_1s/) && pt.match(/[cj]_4s/) && pt.match(/[cj]_7s/))  //123s・456s・789sがそれぞれ存在
+				){
+					y.push({name:"一気通貫",han:[2,1]});
+				}
+				// ・純全帯么九
+				if( !pt.match(/(x|[cj]_[2-6]|[pkat]_[2-8])/) ){//字牌・234～678の順子・2-8の刻子・雀頭を含まない
+					y.push({name:"純全帯么九",han:[3,2]});
+				}
+				// ・混一色
+				if(
+					(l1t.match(/[1-9]m/) && l1t.match(/[tnsphrc]x/) && !l1t.match(/[1-9][ps]/))||//1-9mを含み、字牌を含み、1-9p・1-9sを含まない または
+					(l1t.match(/[1-9]p/) && l1t.match(/[tnsphrc]x/) && !l1t.match(/[1-9][ms]/))||//1-9pを含み、字牌を含み、1-9m・1-9sを含まない または
+					(l1t.match(/[1-9]s/) && l1t.match(/[tnsphrc]x/) && !l1t.match(/[1-9][mp]/))  //1-9sを含み、字牌を含み、1-9m・1-9pを含まない
+				){
+					y.push({name:"混一色",han:[3,2]});
+				}
+				// ・清一色
+				if(
+					(l1t.match(/[1-9]m/) && !l1t.match(/([1-9][ps]|[tnsphrc]x)/))||//1-9mを含み、1-9p・1-9s・字牌を含まない または
+					(l1t.match(/[1-9]p/) && !l1t.match(/([1-9][ms]|[tnsphrc]x)/))||//1-9pを含み、1-9m・1-9s・字牌を含まない または
+					(l1t.match(/[1-9]s/) && !l1t.match(/([1-9][mp]|[tnsphrc]x)/))  //1-9sを含み、1-9m・1-9p・字牌を含まない
+				){
+					y.push({name:"清一色",han:[6,5]});
+				}
+				// ・十二落抬(ローカル)
+				if(l&&  !pt.match(/(a|hk|j)_/) && p.length==5){//暗子・暗槓・暗順を含まない かつ 面子の数が5(標準型)
+					y.push({name:"十二落抬",han:[0,1]});
+				}
+
+				// 牌姿での判定(条件が複雑なもの)
+				// ・平和
+				//★未実装
+
+
+				// ・一盃口
+				// ・二盃口
+				var tmp = 0 //同じ暗順をカウント
+				for (var j = 1; j <= 9; j++) {
+					var reg = new RegExp("j_"+j+"m","g")
+					if(pt.match(reg) && pt.match(reg).length==2)tmp++;
+					var reg = new RegExp("j_"+j+"p","g")
+					if(pt.match(reg) && pt.match(reg).length==2)tmp++;
+					var reg = new RegExp("j_"+j+"s","g")
+					if(pt.match(reg) && pt.match(reg).length==2)tmp++;
+				}
+				if(!pt.match(/(p|c|lk|kk)_/) && tmp==2){//ポン・チー・明槓を含まない かつ 同じ順子が2セット
+					y.push({name:"二盃口",han:[3,0]});
+				}else if(!pt.match(/(p|c|lk|kk)_/) && tmp==1){//ポン・チー・明槓を含まない かつ 同じ順子が1セット
+					y.push({name:"一盃口",han:[1,0]});
+				}
+				// ・三色同順
+				if(
+					(pt.match(/[cj]_1m/) && pt.match(/[cj]_1p/) && pt.match(/[cj]_1s/))||//1m,1p,1s順子をそれぞれ含む または
+					(pt.match(/[cj]_2m/) && pt.match(/[cj]_2p/) && pt.match(/[cj]_2s/))||//2m,2p,2s順子をそれぞれ含む または
+					(pt.match(/[cj]_3m/) && pt.match(/[cj]_3p/) && pt.match(/[cj]_3s/))||//3m,3p,3s順子をそれぞれ含む または
+					(pt.match(/[cj]_4m/) && pt.match(/[cj]_4p/) && pt.match(/[cj]_4s/))||//4m,4p,4s順子をそれぞれ含む または
+					(pt.match(/[cj]_5m/) && pt.match(/[cj]_5p/) && pt.match(/[cj]_5s/))||//5m,5p,5s順子をそれぞれ含む または
+					(pt.match(/[cj]_6m/) && pt.match(/[cj]_6p/) && pt.match(/[cj]_6s/))||//6m,6p,6s順子をそれぞれ含む または
+					(pt.match(/[cj]_7m/) && pt.match(/[cj]_7p/) && pt.match(/[cj]_7s/))  //7m,7p,7s順子をそれぞれ含む
+				){
+					y.push({name:"・三色同順",han:[2,1]});
+				}
+				// ・三色同刻
+				if(
+					(pt.match(/[pka]_1m/) && pt.match(/[pka]_1p/) && pt.match(/[pka]_1s/))||//1m,1p,1s刻子をそれぞれ含む または
+					(pt.match(/[pka]_2m/) && pt.match(/[pka]_2p/) && pt.match(/[pka]_2s/))||//2m,2p,2s刻子をそれぞれ含む または
+					(pt.match(/[pka]_3m/) && pt.match(/[pka]_3p/) && pt.match(/[pka]_3s/))||//3m,3p,3s刻子をそれぞれ含む または
+					(pt.match(/[pka]_4m/) && pt.match(/[pka]_4p/) && pt.match(/[pka]_4s/))||//4m,4p,4s刻子をそれぞれ含む または
+					(pt.match(/[pka]_5m/) && pt.match(/[pka]_5p/) && pt.match(/[pka]_5s/))||//5m,5p,5s刻子をそれぞれ含む または
+					(pt.match(/[pka]_6m/) && pt.match(/[pka]_6p/) && pt.match(/[pka]_6s/))||//6m,6p,6s刻子をそれぞれ含む または
+					(pt.match(/[pka]_7m/) && pt.match(/[pka]_7p/) && pt.match(/[pka]_7s/))||//7m,7p,7s刻子をそれぞれ含む または
+					(pt.match(/[pka]_8m/) && pt.match(/[pka]_8p/) && pt.match(/[pka]_8s/))||//8m,8p,8s刻子をそれぞれ含む または
+					(pt.match(/[pka]_9m/) && pt.match(/[pka]_9p/) && pt.match(/[pka]_9s/))  //9m,9p,9s刻子をそれぞれ含む
+				){
+					y.push({name:"三色同刻",han:[2,2]});
+				}
+				// ・一色三順(ローカル)
+				if(
+					l&& (
+						(pt.match(/[cj]_1m/)&&pt.match(/[cj]_1m/g).length==3) || (pt.match(/[cj]_1p/)&&pt.match(/[cj]_1p/g).length==3) || (pt.match(/[cj]_1s/)&&pt.match(/[cj]_1s/g).length==3)  ||//1m,1p,1s順子のうち1種類が3つ または
+						(pt.match(/[cj]_2m/)&&pt.match(/[cj]_2m/g).length==3) || (pt.match(/[cj]_2p/)&&pt.match(/[cj]_2p/g).length==3) || (pt.match(/[cj]_2s/)&&pt.match(/[cj]_2s/g).length==3)  ||//2m,2p,2s順子のうち1種類が3つ または
+						(pt.match(/[cj]_3m/)&&pt.match(/[cj]_3m/g).length==3) || (pt.match(/[cj]_3p/)&&pt.match(/[cj]_3p/g).length==3) || (pt.match(/[cj]_3s/)&&pt.match(/[cj]_3s/g).length==3)  ||//3m,3p,3s順子のうち1種類が3つ または
+						(pt.match(/[cj]_4m/)&&pt.match(/[cj]_4m/g).length==3) || (pt.match(/[cj]_4p/)&&pt.match(/[cj]_4p/g).length==3) || (pt.match(/[cj]_4s/)&&pt.match(/[cj]_4s/g).length==3)  ||//4m,4p,4s順子のうち1種類が3つ または
+						(pt.match(/[cj]_5m/)&&pt.match(/[cj]_5m/g).length==3) || (pt.match(/[cj]_5p/)&&pt.match(/[cj]_5p/g).length==3) || (pt.match(/[cj]_5s/)&&pt.match(/[cj]_5s/g).length==3)  ||//5m,5p,5s順子のうち1種類が3つ または
+						(pt.match(/[cj]_6m/)&&pt.match(/[cj]_6m/g).length==3) || (pt.match(/[cj]_6p/)&&pt.match(/[cj]_6p/g).length==3) || (pt.match(/[cj]_6s/)&&pt.match(/[cj]_6s/g).length==3)  ||//6m,6p,6s順子のうち1種類が3つ または
+						(pt.match(/[cj]_7m/)&&pt.match(/[cj]_7m/g).length==3) || (pt.match(/[cj]_7p/)&&pt.match(/[cj]_7p/g).length==3) || (pt.match(/[cj]_7s/)&&pt.match(/[cj]_7s/g).length==3)    //7m,7p,7s順子のうち1種類が3つ または
+					)
+				){
+					y.push({name:"一色三順",han:[3,2]});
+				}
+				// ・五門斉(ローカル)
+				if(
+					l&&
+					l1t.match(/[1-9]m/) && //萬子を含む かつ
+					l1t.match(/[1-9]p/) && //筒子を含む かつ
+					l1t.match(/[1-9]s/) && //索子を含む かつ
+					l1t.match(/[tnsp]x/) && //風牌を含む かつ
+					l1t.match(/[hrc]x/) //三元牌を含む
+				){
+					y.push({name:"五門斉",han:[2,2]});
+				}
+				// ・三連刻(ローカル)
+				if(
+					l&& (
+						(pt.match(/[pka]_1m/) && pt.match(/[pka]_2m/) && pt.match(/[pka]_3m/))||//1m,2m,3m刻子をそれぞれ含む または
+						(pt.match(/[pka]_2m/) && pt.match(/[pka]_3m/) && pt.match(/[pka]_4m/))||//2m,3m,4m刻子をそれぞれ含む または
+						(pt.match(/[pka]_3m/) && pt.match(/[pka]_4m/) && pt.match(/[pka]_5m/))||//3m,4m,5m刻子をそれぞれ含む または
+						(pt.match(/[pka]_4m/) && pt.match(/[pka]_5m/) && pt.match(/[pka]_6m/))||//4m,5m,6m刻子をそれぞれ含む または
+						(pt.match(/[pka]_5m/) && pt.match(/[pka]_6m/) && pt.match(/[pka]_7m/))||//5m,6m,7m刻子をそれぞれ含む または
+						(pt.match(/[pka]_6m/) && pt.match(/[pka]_7m/) && pt.match(/[pka]_8m/))||//6m,7m,8m刻子をそれぞれ含む または
+						(pt.match(/[pka]_7m/) && pt.match(/[pka]_8m/) && pt.match(/[pka]_9m/))||//7m,8m,9m刻子をそれぞれ含む または
+						(pt.match(/[pka]_1p/) && pt.match(/[pka]_2p/) && pt.match(/[pka]_3p/))||//1p,2p,3p刻子をそれぞれ含む または
+						(pt.match(/[pka]_2p/) && pt.match(/[pka]_3p/) && pt.match(/[pka]_4p/))||//2p,3p,4p刻子をそれぞれ含む または
+						(pt.match(/[pka]_3p/) && pt.match(/[pka]_4p/) && pt.match(/[pka]_5p/))||//3p,4p,5p刻子をそれぞれ含む または
+						(pt.match(/[pka]_4p/) && pt.match(/[pka]_5p/) && pt.match(/[pka]_6p/))||//4p,5p,6p刻子をそれぞれ含む または
+						(pt.match(/[pka]_5p/) && pt.match(/[pka]_6p/) && pt.match(/[pka]_7p/))||//5p,6p,7p刻子をそれぞれ含む または
+						(pt.match(/[pka]_6p/) && pt.match(/[pka]_7p/) && pt.match(/[pka]_8p/))||//6p,7p,8p刻子をそれぞれ含む または
+						(pt.match(/[pka]_7p/) && pt.match(/[pka]_8p/) && pt.match(/[pka]_9p/))||//7p,8p,9p刻子をそれぞれ含む または
+						(pt.match(/[pka]_1s/) && pt.match(/[pka]_2s/) && pt.match(/[pka]_3s/))||//1s,2s,3s刻子をそれぞれ含む または
+						(pt.match(/[pka]_2s/) && pt.match(/[pka]_3s/) && pt.match(/[pka]_4s/))||//2s,3s,4s刻子をそれぞれ含む または
+						(pt.match(/[pka]_3s/) && pt.match(/[pka]_4s/) && pt.match(/[pka]_5s/))||//3s,4s,5s刻子をそれぞれ含む または
+						(pt.match(/[pka]_4s/) && pt.match(/[pka]_5s/) && pt.match(/[pka]_6s/))||//4s,5s,6s刻子をそれぞれ含む または
+						(pt.match(/[pka]_5s/) && pt.match(/[pka]_6s/) && pt.match(/[pka]_7s/))||//5s,6s,7s刻子をそれぞれ含む または
+						(pt.match(/[pka]_6s/) && pt.match(/[pka]_7s/) && pt.match(/[pka]_8s/))||//6s,7s,8s刻子をそれぞれ含む または
+						(pt.match(/[pka]_7s/) && pt.match(/[pka]_8s/) && pt.match(/[pka]_9s/))  //7s,8s,9s刻子をそれぞれ含む
+					)
+				){
+					y.push({name:"三連刻",han:[2,2]});
+				}
+
+				debugText += "<br>和了形:"+pt+"<br>";
+				for(var j in y){
+					if(typeof y[j].han != "undefined"){
+						debugText += y[j].name +" "+ y[j].han[ (!pt.match(/(p|c|lk|kk)_/)?0:1) ] +"翻<br>";
+					}else{
+						debugText += y[j].name +" "+ (y[j].yakuman==2?"2倍":"") +"役満<br>";
+					}
+				}
+			}//全パターンループここまで
+
+			console.log("results:",results)
+
+
+			$("#test").html(debugText)
+		}
+
+		function setDetect(comps,sets,tiles,mode,tatsuCount){
+			//compsは、完成したパターンを格納するためのオブジェクト(参照)
+			//setsはここまでの処理での完成済みグループ
+			//tilesはここまでの処理での未処理牌
+			//modeには"agari","tenpai"いずれかを記入
+			var num=0
+			var c=tiles[num]//current
+			var o=tiles.concat() ;o.splice(num,1);//others それ以外の牌
+			//刻子
+			if(tiles.length>=3){
+				var num2=null
+				var num3=null
+				var o2 = o.concat()//コピー
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c){
+						num2=i;
+						o2.splice(num2,1)
+						break;
+					}
+				}
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c){
+						num3=i;
+						o2.splice(num3,1)
+						break;
+					}
+				}
+				if(num2!=null && num3!=null){
+					if(o2.length==0){
+						comps = comps.push( sets.concat( [{type:"anko",tiles:[c,c,c]}] ) )
+					}else{
+						setDetect(comps,sets.concat( [{type:"anko",tiles:[c,c,c]}] ),o2.concat(),mode,tatsuCount)
+					}
+				}
+			}
+
+			//順子
+			if(!c.match(/x/) && tiles.length>=3){//字牌だったらskip
+				var num2=null
+				var num3=null
+				var o2 = o.concat()//コピー
+				var c2 = (c.substr(0,1)*1 +1) + c.substr(1,1)//1つ次の牌。ここで10pとか11mとか出来るが気にしない
+				var c3 = (c.substr(0,1)*1 +2) + c.substr(1,1)
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c2){
+						num2=i;
+						o2.splice(num2,1)
+						break;
+					}
+				}
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c3){
+						num3=i;
+						o2.splice(num3,1)
+						break;
+					}
+				}
+				if(num2!=null && num3!=null){
+					if(o2.length==0){
+						comps = comps.push( sets.concat( [{type:"jun",tiles:[c,c2,c3]}] ) )
+					}else{
+						setDetect(comps,sets.concat( [{type:"jun",tiles:[c,c2,c3]}] ),o2.concat(),mode,tatsuCount)
+					}
+				}
+			}
+
+			//対子/雀頭
+			if(true){//★仮。
+				var num2=null
+				var o2 = o.concat()//コピー
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c){
+						num2=i;
+						o2.splice(num2,1)
+						break;
+					}
+				}
+				if(num2!=null){
+					if(o2.length==0){
+						comps = comps.push( sets.concat( [{type:"toi",tiles:[c,c]}] ) )
+					}else{
+						setDetect(comps,sets.concat( [{type:"toi",tiles:[c,c]}] ),o2.concat(),mode,tatsuCount)
+					}
+				}
+			}
+
+			//搭子
+			if(!c.match(/x/) && tiles.length>=2 && mode=="tenpai" && tatsuCount==0){//字牌だったらskip
+				var num2=null
+				var o2 = o.concat()//コピー
+				var c2 = (c.substr(0,1)*1 +1) + c.substr(1,1)//1つ次の牌。ここで10pとか11mとか出来るが気にしない
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c2){
+						num2=i;
+						o2.splice(num2,1)
+						break;
+					}
+				}
+				if(num2!=null){
+					if(o2.length==0){
+						comps = comps.push( sets.concat( [{type:"ta",tiles:[c,c2]}] ) )
+					}else{
+						setDetect(comps,sets.concat( [{type:"ta",tiles:[c,c2]}] ),o2.concat(),mode,tatsuCount++)
+					}
+				}
+			}
+			//嵌搭子
+			if(!c.match(/x/) && tiles.length>=2 && mode=="tenpai" && tatsuCount==0){//字牌だったらskip
+				var num2=null
+				var o2 = o.concat()//コピー
+				var c2 = (c.substr(0,1)*1 +2) + c.substr(1,1)//2次の牌。ここで10pとか11mとか出来るが気にしない
+				for (var i=num ; i<o2.length;i++){
+					if(o2[i]==c2){
+						num2=i;
+						o2.splice(num2,1)
+						break;
+					}
+				}
+				if(num2!=null){
+					if(o2.length==0){
+						comps = comps.push( sets.concat( [{type:"kanta",tiles:[c,c2]}] ) )
+					}else{
+						setDetect(comps,sets.concat( [{type:"kanta",tiles:[c,c2]}] ),o2.concat(),mode,tatsuCount++)
+					}
+				}
+			}
+
+		}
+
+
+
+		$(function(){
+			$("#test").text("onload")
+			calcHanFu(input)
+		})
+	</script>
+</head>
+<body>
+	<div id="test"></div>
+</body>
+</html>
