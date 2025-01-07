@@ -1,75 +1,200 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CSV Processor</title>
-  <link rel="stylesheet" href="csvProcessor.css">
-  <script src="csvProcessor.js"></script>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CSV Processor</title>
+	<link rel="stylesheet" href="csvProcessor.css">
+	<script src="csvProcessor.js"></script>
 </head>
 <body>
-  <div id="content">
-    <div id="step1" class="stepBox">
-      <h2>Step 1: 入力</h2>
-      <h3>ファイル読み込み</h3>
-      <div>
-        ファイルを選択：<input type="file" id="csvFileInput" accept=".csv" multiple><br>
-        フォルダを選択(一括読込)：
-        <button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
-        <label class="optionBox">
-        読み込み対象とする拡張子:<input type="text" id="fileExtensionInput" value=".csv" style="width: 5em;" disabled></label><button id="directoryReloadButton" disabled>再読込</button><br>
-        内容サンプル表示：<br>
-        <textarea id="csvDataInput" rows="10" cols="50" placeholder="ここに直接入力することもできます"></textarea><br>
-      </div>
+	<div id="content">
+		<div id="step1" class="stepBox">
+			<h2>Step 1: 入力</h2>
+			<h3>読み込み方法の設定</h3>
+			<div>
+				<div class="optionSet">
+					<label class="optionBox"><input type="radio" name="inputMethod" value="file" checked> ファイルを読み込む</label>
+					<label class="optionBox">
+						ファイルを選択：<input type="file" id="csvFileInput" accept=".csv" multiple>
+					</label>
+				</div>
+				<div class="optionSet">
+					<label class="optionBox"><input type="radio" name="inputMethod" value="directory"> フォルダを読み込む</label>
+					<label class="optionBox">
+						フォルダを選択：
+						<button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
+					</label>
+					<label class="optionBox">
+						読み込み対象とする拡張子:<input type="text" id="fileExtensionInput" value=".csv" style="width: 5em;" disabled></label><button id="directoryReloadButton" disabled>再読込</button>
+					</div>
+					<div class="optionSet">
+						<label class="optionBox"><input type="radio" name="inputMethod" value="direct"> 直接入力</label><br>
+						<textarea id="csvDataInput" rows="10" cols="50" placeholder="ここに直接入力することもできます"></textarea>
+					</div> 
+					
+				</div>
+				
+				<h3>読み込みオプション</h3>
+				<div id="inputOptions">
+					プレビューを見ながら、正常に読み込まれるように設定してください。<br>
+					<table id="inputOptionTable">
+						<tr>
+							<th>区切り文字</th>
+							<td><label>区切り文字：<input type="text" id="delimiterInput" value="," style="width: 3em;"></label></td>
+						</tr>
+						<tr>
+							<th>改行文字</th>
+							<td>
+								<select id="lineBreakInput">
+									<option value="ALL" selected>CR,LF,CRLF</option>
+									<option value="CR">CR</option>
+									<option value="LF">LF</option>
+									<option value="CRLF">CRLF</option>
+								</select>
+							</td>
+						</tr>
+						<tr>
+							<th>先頭スキップ</th>
+							<td><label><input type="number" id="skipRowNumberInput" value="0" style="width: 3em;" min="0">行を読み飛ばす</label></td>
+						</tr>
+						<tr>
+							<th>空行</th>
+							<td><label><input type="checkbox" id="skipEmptyRowCheckbox">空の行を読み飛ばす</label></td>
+						</tr>
+						<tr>
+							<th>タイトル行</th>
+							<td><label><input type="checkbox" id="isUsingHeaderCheckbox">先頭行をタイトル行として扱う</label></td>
+						</tr>
+						<tr>
+							<th>囲み文字</th>
+							<td>
+								<label><input type="checkbox" id="isUsingWrapperCheckbox" checked>囲み文字を使用</label><br>
+								<label>囲み文字：<input type="text" id="wrapperInput" value='"' style="width: 3em;"></label>
+							</td>
+						</tr>
+						<tr>
+							<th>セル内の特殊文字</th>
+							<td>
+								<label><input type="checkbox" id="isUsingLineBreakInWrapperCheckbox">セル内に改行文字を含む</label><br>
+								<label><input type="checkbox" id="isUsingDelimiterInWrapperCheckbox">セル内に区切り文字を含む</label><br>
+								<label><input type="checkbox" id="isUsingWrapperInWrapperCheckbox" checked>セル内に囲み文字を含む</label>
+							</td>
+						</tr>
+						<tr>
+							<th>末尾の改行</th>
+							<td><label><input type="checkbox" id="ignoreLastLineBreakCheckbox" checked>入力末尾の改行は無視</label></td>
+						</tr>
+					</table>
+				</div>
+				<h3>プレビュー表示</h3>
+				<div>
+					<label class="optionBox">文字数リミット : <input type="number" id="previewCharLimitInput" value="1000" style="width: 5em;">文字</label><br>
+					<span id="readingModeView">処理モードを表示</span><!-- ★ -->
+					<div id="csvPreviewBox">
+						<table id="csvPreviewTable"></table>
+					</div>
+				</div>
+			</div>
+			<div id="step2" class="stepBox">
+				<h2>Step 2: 処理</h2>
+				対応予定機能
+				<span>カラムの値を書き換える (対象カラム設定・処理内容設定(正規表現対応)</span>
+				<span>カラムの抽出(削除)・並び替え</span>
+			</div>
+			<div id="step3" class="stepBox">
+				<h2>Step 3: 出力</h2>
+				<h3>出力プレビュー</h3>
+				<div>
+					<!-- <label class="optionBox">文字数リミット : <input type="number" id="outputPreviewCharLimitInput" value="1000" style="width: 5em;">文字</label><br> -->
+					<div id="outputPreviewBox">
+						<table id="outputPreviewTable"></table>
+					</div>
+				</div>
+				
+				<h3>出力方法の設定</h3>
+				<div class="optionSet">
+					<label class="optionBox"><input type="radio" name="outputMethod" value="direct"> 直接出力</label><br>
+					<textarea id="csvDataOutputTextarea" rows="10" cols="50" placeholder="ここに出力が表示されます"></textarea>
+				</div>
+				<div class="optionSet">
+					<label class="optionBox"><input type="radio" name="outputMethod" value="directory" checked> フォルダに出力</label><button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
+				</div>
+				
+				<h3>出力オプション</h3>
+				<table id="outputOptionTable">
+					<tr>
+						<th>区切り文字</th>
+						<td><label>区切り文字：<input type="text" id="outputDelimiterInput" value="," style="width: 3em;"></label></td>
+					</tr>
+					<tr>
+						<th>改行文字</th>
+						<td><select id="outputLineBreakInput">
+							<option value="CRLF" selected>CRLF</option>
+							<option value="CR">CR</option>
+							<option value="LF">LF</option>
+						</select>
+					</td>
+					<tr>
+						<th>囲み文字</th>
+						<td>
+							<label><input type="checkbox" id="outputIsUsingWrapperCheckbox" checked>囲み文字を使用</label><br>
+							<label>囲み文字：<input type="text" id="outputWrapperInput" value='"' style="width: 3em;"></label><br>
+							<label><input type="checkbox" id="outputIsUsingWrapperAllCheckbox">すべてのセルに囲み文字を使用</label><br>
+						</td>
+						</tr>
+					</tr>
+					<tr>
+						<th>タイトル行</th>
+						<td><label><input type="checkbox" id="outputIsUsingHeaderCheckbox">先頭にタイトル行を出力</label>
+						</td>
+					</tr>
+					<tr>
+						<th>末尾の改行</th>
+						<td><label><input type="checkbox" id="outputAddLastLineBreakCheckbox" checked>出力末尾に改行をつける</label></td>
+					</tr>
+					<tr>
+						<th>セル内の特殊文字</th>
+						<td>
+							<label><input type="checkbox" id="outputIsUsingSpecialCharacterInWrapperCheckbox">セル内に改行・区切り文字・囲み文字を含む</label>
+						</td>
+					</tr>
+					<tr>
+						<th>先頭にテキスト追加</th>
+						<td>
+							<textarea id="outputPrefixText" rows="2" cols="50" placeholder="出力ファイルの先頭に追加するテキストを入力してください。多くの場合、末尾に改行が必要です" disabled></textarea>
+						</td>
+					</tr>
+					<tr>
+						<th>末尾にテキスト追加</th>
+						<td>
+							<textarea id="outputSuffixText" rows="2" cols="50" placeholder="出力ファイルの末尾に追加するテキストを入力してください" disabled></textarea>
+						</td>
+				</table>
 
-      <h3>読み込みオプション</h3>
-      <div id="loadingOptions">
-        プレビューを見ながら、正常に読み込まれるように設定してください。<br>
-        基本事項<span class="optionBox">区切り文字:<input type="text" id="delimiterInput" value="," style="width: 3em;"></span>
-        <span class="optionBox">改行文字:<select id="lineBreakInput">
-          <option value="ALL" selected>CR,LF,CRLF</option>
-          <option value="CR">CR</option>
-          <option value="LF">LF</option>
-          <option value="CRLF">CRLF</option>
-        </select></span><br>
-        行読み飛ばし関係 <span class="optionBox">先頭を<input type="number" id="skipRowNumberInput" value="0" style="width: 3em;" min="0">行読み飛ばす</span>
-        <label class="optionBox"><input type="checkbox" id="skipEmptyRowCheckbox">空の行は読み飛ばす</label><br>
-        ヘッダー行 <label class="optionBox"><input type="checkbox" id="isHeaderCheckbox">ヘッダー行あり</label>
-        <br>
-        囲み文字 <label class="optionBox"><input type="checkbox" id="isUseWrapperCheckbox" checked>囲み文字を使用している</label>
-        <span class="optionBox">囲み文字:<input type="text" id="wrapperInput" value='"' style="width: 3em;"></span><br>
-        複雑なCSV <label class="optionBox"><input type="checkbox" id="isUseLineBreakInWrapperCheckbox">セル内に改行文字を含む場合がある</label>
-        <label class="optionBox"><input type="checkbox" id="isUseDelimiterInWrapperCheckbox">セル内に区切り文字を含む場合がある</label>
-        <label class="optionBox"><input type="checkbox" id="isUseWrapperInWrapperCheckbox" checked>セル内に囲み文字を含む場合がある</label><br>
-        その他 <label class="optionBox"><input type="checkbox" id="ignoreLastLineBreakCheckbox" checked>入力末尾の改行は無視</label>
-      </div>
-      <h3>プレビュー表示</h3>
-      <div>
-        <span class="optionBox">文字数リミット : <input type="number" id="previewCharLimitInput" value="1000" style="width: 5em;">文字</span><br>
-        <span id="readingModeView">処理モードを表示</span><!-- ★ -->
-        <div id="csvPreviewBox">
-          <table id="csvPreviewTable"></table>
-        </div>
-      </div>
-    </div>
-    <div id="step2" class="stepBox">
-      <h2>Step 2: 処理</h2>
-      対応予定機能
-      <span>カラムの値を書き換える (対象カラム設定・処理内容設定(正規表現対応)</span>
-      <span>カラムの抽出(削除)・並び替え</span>
-    </div>
-    <div id="step3" class="stepBox">
-      <h2>Step 3: 出力</h2>
-      対応予定機能
-      <span>出力ディレクトリ指定(直接書き込む)</span>
-      <span>出力ファイル名指定(自動連番対応)</span>
-      <span>抽出</span>
-      <span>振り分け(単純一致・数値大小判定・正規表現対応)</span>
-      <span>区切り文字・改行文字・ヘッダー行</span>
-      <span>行数での分割</span>
-      <span>ファイル上書きor追記</span>
-      <span>出力プレビュー</span>
-    </div>
-  </div>
-</body>
+				<h3>出力ファイル設定</h3>
+				<div class="optionBox">ファイル名(振分・抽出)：<br>
+					<textarea id="outputFileNameInput" rows="2" cols="50" placeholder="出力ファイル名を入力してください"></textarea>
+				</div>
+				<!-- 自動連番にも対応する -->
+				<!-- 正規表現にも対応する -->
+				<div class="optionSet">
+					<label class="optionBox">
+						<input type="checkbox" id="splitOutputCheckbox">ファイルを指定行数で分割する
+					</label>
+					<label class="optionBox">
+						分割行数 : <input type="number" id="maxRowsInput" value="0" style="width: 5em;">行
+					</label>
+				</div>
+				<div class="optionSet">
+					<span class="optionBox">
+						すでにファイルが存在する場合
+						<label><input type="radio" name="fileExistActionRadiobutton" value="overwrite" checked> 上書き</label>
+						<label><input type="radio" name="fileExistActionRadiobutton" value="append"> 追記</label>
+					</span>
+				</div>
+				<div id="outputButton">ファイル出力</div>
+			</div>
+		</div>
+	</body>
 </html>
