@@ -9,10 +9,18 @@ body{
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
+    font-size: 12px;
 }
 
 textarea{
     margin: 2px;
+}
+
+h2{
+    margin: 0.5em 0;
+}
+h3{
+    margin: 0.5em 0;
 }
 
 /* 汎用品 */
@@ -86,7 +94,7 @@ label:hover{
 }
 #csvPreviewTable th, #csvPreviewTable td{
   border: 1px solid #555;
-  padding: 5px;
+  padding: 2px 5px;
 }
 #csvPreviewTable th{
   font-weight: bold;
@@ -105,7 +113,7 @@ label:hover{
 }
 #outputPreviewTable th, #outputPreviewTable td{
   border: 1px solid #555;
-  padding: 5px;
+  padding: 2px 5px;
 }
 #outputPreviewTable th{
   font-weight: bold;
@@ -120,7 +128,7 @@ label:hover{
 #inputOptionTable th, #inputOptionTable td{
   text-align-last: left;
   border: 1px solid #555;
-  padding: 5px;
+  padding: 2px 5px;
 }
 
 #outputOptionTable{
@@ -131,7 +139,7 @@ label:hover{
 #outputOptionTable th, #outputOptionTable td{
   text-align-last: left;
   border: 1px solid #555;
-  padding: 5px;
+  padding: 2px 5px;
 }
 
 #outputButton{
