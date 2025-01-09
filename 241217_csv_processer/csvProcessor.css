@@ -82,21 +82,21 @@ label:hover{
   background-color: #FDD;
 }
 
-#csvPreviewBox{
+#inputPreviewBox{
   font-size: 0.8em;
   margin: 0 10px;
   padding: 5px;
   border: 1px dashed #666;
 }
 
-#csvPreviewTable{
+#inputPreviewTable{
   border-collapse: collapse;
 }
-#csvPreviewTable th, #csvPreviewTable td{
+#inputPreviewTable th, #inputPreviewTable td{
   border: 1px solid #555;
   padding: 2px 5px;
 }
-#csvPreviewTable th{
+#inputPreviewTable th{
   font-weight: bold;
   background-color: #CCC;
 }

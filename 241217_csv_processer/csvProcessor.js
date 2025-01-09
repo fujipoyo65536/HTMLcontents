@@ -5,27 +5,11 @@
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
 
-	// // #inputOptions内のinputに変更があったらプレビューを更新
-	// const inputOptions = document.getElementById('inputOptions');
-	// inputOptions.addEventListener('input', function(){
-	// 	updatePreview();
-	// });
-	// // #csvDataInputに変更があったらプレビューを更新
-	// const csvDataInput = document.getElementById('csvDataInput');
-	// csvDataInput.addEventListener('input', function(){
-	// 	updatePreview();
-	// });
-	// // #previewCharLimitInputに変更があったらプレビューを更新
-	// const previewCharLimitInput = document.getElementById('previewCharLimitInput');
-	// previewCharLimitInput.addEventListener('input', function(){
-	// 	updatePreview();
-	// });
-
 	// すべてのinput,textarea,selectに変更があったときの処理
 	const inputElements = document.querySelectorAll('input,textarea,select');
 	inputElements.forEach(function(element) {
 		element.addEventListener('input', function(){
-			updatePreview();
+			csvProcessor.updatePreview();
 		});
 	});
 
@@ -35,27 +19,27 @@ document.addEventListener('DOMContentLoaded', function() {
 		element.addEventListener('change', function(){
 			switch(element.value){
 				case 'file':
-					document.getElementById('csvFileInput').disabled = false;
+					document.getElementById('selectFileButton').disabled = false;
 					document.getElementById('inputDirectorySelectButton').disabled = true;
-					document.getElementById('fileExtensionInput').disabled = true;
+					document.getElementById('inputFileExtensionInput').disabled = true;
 					document.getElementById('directoryReloadButton').disabled = true;
-					document.getElementById('csvDataInput').disabled = true;
+					document.getElementById('inputCsvTextInput').disabled = true;
 					break;
 
 				case 'directory':
-					document.getElementById('csvFileInput').disabled = true;
+					document.getElementById('selectFileButton').disabled = true;
 					document.getElementById('inputDirectorySelectButton').disabled = false;
-					document.getElementById('fileExtensionInput').disabled = false;
+					document.getElementById('inputFileExtensionInput').disabled = false;
 					document.getElementById('directoryReloadButton').disabled = false;
-					document.getElementById('csvDataInput').disabled = true;
+					document.getElementById('inputCsvTextInput').disabled = true;
 					break;
 
 				case 'direct':
-					document.getElementById('csvFileInput').disabled = true;
+					document.getElementById('selectFileButton').disabled = true;
 					document.getElementById('inputDirectorySelectButton').disabled = true;
-					document.getElementById('fileExtensionInput').disabled = true;
+					document.getElementById('inputFileExtensionInput').disabled = true;
 					document.getElementById('directoryReloadButton').disabled = true;
-					document.getElementById('csvDataInput').disabled = false;
+					document.getElementById('inputCsvTextInput').disabled = false;
 					break;
 			}
 		});
@@ -64,12 +48,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 	// ファイルが入力されたら、いったん1ファイル目だけを読み込む
-	const fileInput = document.getElementById('csvFileInput');
+	const fileInput = document.getElementById('selectFileButton');
 	fileInput.addEventListener('change', function(){
 		const file = fileInput.files[0];
 		const reader = new FileReader();
 		reader.onload = function(){
-			document.getElementById('csvDataInput').value = reader.result.slice(0, 20000);
+			document.getElementById('inputCsvTextInput').value = reader.result.slice(0, 20000);
 			updatePreview();
 		};
 		reader.readAsText(file);
@@ -77,77 +61,118 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 	//デバッグ用
-	// document.getElementById('csvDataInput').value = '1,2,3\n4,5,6\n7,"8",9\n"te""s""t1","te\nst2","te,st3"\nabc,def,ghi,jkl,mno\n\npqr,stu,vwx,yz\n';
-	document.getElementById('csvDataInput').value = '列A,列B,列C\n1,2,3\n4,5,6,一列多い例\n7,8,9次行は空行\n\n"セル内に→""←セミコロン","セル内に→\n←改行","セル内に→,←カンマ"\n10,一列少ない例\n11,12,末尾に改行\n';
-	updatePreview();
+	document.getElementById('inputCsvTextInput').value = '列A,列B,列C\n1,2,3\n4,5,6,一列多い例\n7,8,9次行は空行\n\n"セル内に→""←セミコロン","セル内に→\n←改行","セル内に→,←カンマ"\n10,一列少ない例\n11,12,末尾に改行\n';
+	csvProcessor.updatePreview();
 });
 
-function updatePreview(){
-	const limit = document.getElementById('previewCharLimitInput').value;
-	const inputText = document.getElementById('csvDataInput').value.slice(0, limit);
+const csvProcessor = {
 
-	const csvArray = csvTextToArray(inputText,{
-		delimiter: document.getElementById('delimiterInput').value || ',',
-		lineBreakSelect: document.getElementById('lineBreakInput').value || 'ALL',
-		skipRowNumber: document.getElementById('skipRowNumberInput').value || 0,
-		skipEmptyRow: document.getElementById('skipEmptyRowCheckbox').checked || false,
-		ignoreLastLineBreak: document.getElementById('ignoreLastLineBreakCheckbox').checked || false,
-		isUsingHeader: document.getElementById('isUsingHeaderCheckbox').checked || false,
-		wrapper: document.getElementById('wrapperInput').value || '"',
-		isUsingWrapper: document.getElementById('isUsingWrapperCheckbox').checked || false,
-		isUsingDelimiterInWrapper: document.getElementById('isUsingDelimiterInWrapperCheckbox').checked || false,
-		isUsingWrapperInWrapper: document.getElementById('isUsingWrapperInWrapperCheckbox').checked || false,
-		isUsingLineBreakInWrapper: document.getElementById('isUsingLineBreakInWrapperCheckbox').checked || false,
-	});
+	updatePreview: ()=>{
+		const options = csvProcessor.getOptionsFromHtml();
 
-	// 入力プレビュー
-	const previewTableElement = document.getElementById('csvPreviewTable');
-	viewTable(csvArray,previewTableElement);
+		const limit = document.getElementById('inputPreviewCharLimitInput').value*1;
+		const inputText = options.inputCsvText.slice(0, limit);
 
-	// 出力プレビュー
-	const outputPreviewTableElement = document.getElementById('outputPreviewTable');
-	// const outputLimit = document.getElementById('outputPreviewCharLimitInput').value;
-	viewTable(csvArray,outputPreviewTableElement);
+		const csvArray = csvProcessor.csvTextToArray(inputText,{
+			delimiter: options.inputDelimiter || ',',
+			lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
+			skipRowNumber: options.inputSkipRowNumber || 0,
+			skipEmptyRow: options.inputSkipEmptyRow || false,
+			ignoreLastLineBreak: options.inputIgnoreLastLineBreak || false,
+			isUsingHeader: options.inputIsUsingHeader || false,
+			wrapper: options.inputWrapper || '"',
+			isUsingWrapper: options.inputIsUsingWrapper || false,
+			isUsingDelimiterInWrapper: options.inputIsUsingDelimiterInWrapper || false,
+			isUsingWrapperInWrapper: options.inputIsUsingWrapperInWrapper || false,
+			isUsingLineBreakInWrapper: options.inputIsUsingLineBreakInWrapper || false,
+		});
 
-	// 出力テキスト
-	let lineBreak
-	switch(document.getElementById('outputLineBreakInput').value){
-		case 'LF':
-			lineBreak = '\n';
-			break;
-		case 'CR':
-			lineBreak = '\r';
-			break;
-		case 'CRLF':
-			lineBreak = '\r\n';
-			break;
-		default:
-			lineBreak = '\n';
-			break;
-	}
+		// 入力プレビュー
+		const previewTableElement = document.getElementById('inputPreviewTable');
+		csvProcessor.viewTable(csvArray,previewTableElement);
 
+		// 出力プレビュー
+		const outputPreviewTableElement = document.getElementById('outputPreviewTable');
+		csvProcessor.viewTable(csvArray,outputPreviewTableElement);
 
-	const outputText = ArrayToCsvText(csvArray,{
-		delimiter: document.getElementById('outputDelimiterInput').value || ',',
-		lineBreak,
-		isUsingHeader: document.getElementById('outputIsUsingHeaderCheckbox').checked || false,
-		wrapper: document.getElementById('outputWrapperInput').value || '"',
-		isUsingWrapper: document.getElementById('outputIsUsingWrapperCheckbox').checked || false,
-		isUsingWrapperAll: document.getElementById('outputIsUsingWrapperAllCheckbox').checked || false,
-		isUsingSpecialCharacterInWrapper: document.getElementById('outputIsUsingSpecialCharacterInWrapperCheckbox').checked || false,
-		addLastLineBreak: document.getElementById('outputAddLastLineBreakCheckbox').checked || false,
-	});
+		// 出力テキスト
+		let lineBreak
+		switch(options.outputLineBreakSelect){
+			case 'LF':
+				lineBreak = '\n';
+				break;
+			case 'CR':
+				lineBreak = '\r';
+				break;
+			case 'CRLF':
+				lineBreak = '\r\n';
+				break;
+			default:
+				lineBreak = '\n';
+				break;
+		}
 
-	const csvDataOutputElement = document.getElementById('csvDataOutputTextarea');
-	csvDataOutputElement.value = outputText;
+		const outputText = csvProcessor.arrayToCsvText(csvArray,{
+			delimiter: options.outputDelimiter || ',',
+			lineBreak,
+			isUsingHeader: options.outputIsUsingHeader || false,
+			wrapper: options.outputWrapper || '"',
+			isUsingWrapper: options.outputIsUsingWrapper || false,
+			isUsingWrapperAll: options.outputIsUsingWrapperAll || false,
+			isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
+			addLastLineBreak: options.outputAddLastLineBreak || false,
+		});
 
-}
+		const csvDataOutputElement = document.getElementById('csvTextOutputTextarea');
+		csvDataOutputElement.value = outputText;
 
-function viewTable(csvArray,elem){
+	},
+
+	processCsv: (csvArray)=>{
+
+		const options = csvProcessor.getOptionsFromHtml();
+		// csvごとに行う処理
+		// ★本当はここに繰り返しを書く
+		const perCsvCode = document.querySelector("textarea[data-processOption='csvCode']").value;
+			if(perCsvCode !== ""){
+				const ret = csvProcessor.execUserCode(perCsvCode);
+				if(ret !== undefined)csvArray = ret;
+			}
+
+		for([rowIndex,rowData] of csvArray.entries()){
+			if(rowData === null)continue;
+			// 行ごとに行う処理
+			// ★本当はここに繰り返しを書く
+			const perRowCode = document.querySelector("textarea[data-processOption='rowCode']").value;
+			if(perRowCode !== ""){
+				const ret = csvProcessor.execUserCode(perRowCode);
+				if(ret !== undefined)csvArray[rowIndex] = ret;
+			}
+
+			for([cellIndex,cellData] of rowData.entries()){
+				// セルごとに行う処理
+				// ★本当はここに繰り返しを書く
+				const perCellCode = document.querySelector("textarea[data-processOption='cellCode']").value;
+				if(perCellCode !== ""){
+					const ret = csvProcessor.execUserCode(perCellCode);
+					if(ret !== undefined)csvArray[rowIndex][cellIndex] = ret;
+				}
+			} // セルごと
+		} // 行ごと
+		console.log(csvArray);
+	},
+
+	execUserCode: (userCode)=>{
+		let code= userCode;
+		const func = new Function(code);
+		return func();
+	},
+
+	viewTable: (csvArray,elem)=>{
 	// テーブルをクリア
 	elem.innerHTML = '';
 
-		// プレビューを表示
+	// プレビューを表示
 	if(csvArray.length == 0 || (csvArray.length == 1 && csvArray[0] == null)){
 		elem.innerHTML = '<td>(データ無し)</td>';
 		return;
@@ -172,10 +197,36 @@ function viewTable(csvArray,elem){
 		});
 		elem.appendChild(row);
 	}
-};
+	},
 
-// csvTextToArray
-function csvTextToArray(csvText,options={
+	getOptionsFromHtml: ()=>{
+		let options = {}
+		// HTMLから各オプションの値を取得して格納
+		// HTMLの[data-option]属性を持つ要素を取得
+
+		const optionElements = document.querySelectorAll('[data-option]');
+		optionElements.forEach(function(element){
+			const key = element.dataset.option;
+			const value = element.value;
+
+			// type属性によって適切に処理する
+			switch(element.type){
+				case 'checkbox':
+					options[key] = element.checked;
+					break;
+				case 'number':
+					options[key] = Number(value);
+					break;
+				default:
+					options[key] = value;
+					break;
+			}
+		});
+
+		return options;
+	},
+
+	csvTextToArray: (csvText,options={
 		delimiter:',',
 		lineBreakSelect:'ALL', // ALL,LF,CR,CRLF
 		skipRowNumber:0,
@@ -186,7 +237,7 @@ function csvTextToArray(csvText,options={
 		isUsingWrapper:false,
 		isUsingDelimiterInWrapper:false,
 		isUsingWrapperInWrapper:false,
-		isUsingLineBreakInWrapper:false}){
+		isUsingLineBreakInWrapper:false})=>{
 
 
 	let lineBreak
@@ -378,21 +429,16 @@ function csvTextToArray(csvText,options={
 				}//1文字ずつ
 				
 				// 最後のセルを追加
-				// if(cell != ""){
-					row.push(cell);
-				// }
-				// if(row.length > 0){
-					result.push(row);
-				// }
-
+				row.push(cell);
+				result.push(row);
 			}
 			break;
 		}//switch
 		console.log(result);
 		return result; 
-}
+	},
 
-function ArrayToCsvText(array,options={
+	arrayToCsvText: (array,options={
 		delimiter:',',
 		lineBreak:'\n',
 		isUsingHeader:false,
@@ -400,7 +446,7 @@ function ArrayToCsvText(array,options={
 		isUsingWrapper:false,
 		isUsingWrapperAll:false,
 		isUsingSpecialCharacterInWrapper:false,
-		addLastLineBreak:false}){
+		addLastLineBreak:false})=>{
 	let result = "";
 
 	// 先に、すべてのセルの特殊文字をチェック・置換
@@ -408,7 +454,6 @@ function ArrayToCsvText(array,options={
 		for([rowIndex,row] of array.entries()){
 			if(row === null)continue;
 			for([cellIndex,cell] of row.entries()){
-				// if(options.isUsingWrapperAll || (cell.includes(options.wrapper)||cell.includes(options.delimiter)||cell.includes(options.lineBreak))){
 				if(options.isUsingWrapperAll || (cell.includes(options.wrapper)||cell.includes(options.delimiter)||cell.includes("\n")||cell.includes("\r"))){ // 安全のため、CR・LFのいずれかがある場合はエスケープ
 					array[rowIndex][cellIndex] = `${options.wrapper}${cell.replace(new RegExp(options.wrapper, 'g'), options.wrapper + options.wrapper)}${options.wrapper}`;
 				}
@@ -436,4 +481,6 @@ function ArrayToCsvText(array,options={
 	}
 
 	return result;
-};
+	},
+
+}
