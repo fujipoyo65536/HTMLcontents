@@ -174,6 +174,7 @@ function viewTable(csvArray,elem){
 	}
 };
 
+// csvTextToArray
 function csvTextToArray(csvText,options={
 		delimiter:',',
 		lineBreakSelect:'ALL', // ALL,LF,CR,CRLF
