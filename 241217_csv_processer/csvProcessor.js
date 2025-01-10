@@ -130,42 +130,67 @@ const csvProcessor = {
 
 	processCsv: (csvArray)=>{
 
+		// 先にユーザー関数の準備
+		let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='cellCode']").value);
+		let perCellFuncFlag
+		if(typeof perCellFunc === 'function'){
+			csvProcessor.perCellFunc = perCellFunc;
+			perCellFuncFlag = true;
+		}else if(typeof perCellFunc === 'string'){
+			csvProcessor.perCellFunc = undefined;
+			console.error("セルごとに実行する処理の定義に失敗しました。",perCellFunc);
+			perCellFuncFlag = false;
+		}
+		
+			
+
 		const options = csvProcessor.getOptionsFromHtml();
 		// csvごとに行う処理
-		// ★本当はここに繰り返しを書く
 		const perCsvCode = document.querySelector("textarea[data-processOption='csvCode']").value;
 			if(perCsvCode !== ""){
-				const ret = csvProcessor.execUserCode(perCsvCode);
+				// const ret = csvProcessor.execUserCode(perCsvCode);
 				if(ret !== undefined)csvArray = ret;
 			}
 
 		for([rowIndex,rowData] of csvArray.entries()){
 			if(rowData === null)continue;
 			// 行ごとに行う処理
-			// ★本当はここに繰り返しを書く
 			const perRowCode = document.querySelector("textarea[data-processOption='rowCode']").value;
 			if(perRowCode !== ""){
-				const ret = csvProcessor.execUserCode(perRowCode);
+				// const ret = csvProcessor.execUserCode(perRowCode);
 				if(ret !== undefined)csvArray[rowIndex] = ret;
 			}
 
 			for([cellIndex,cellData] of rowData.entries()){
 				// セルごとに行う処理
-				// ★本当はここに繰り返しを書く
-				const perCellCode = document.querySelector("textarea[data-processOption='cellCode']").value;
-				if(perCellCode !== ""){
-					const ret = csvProcessor.execUserCode(perCellCode);
-					if(ret !== undefined)csvArray[rowIndex][cellIndex] = ret;
+				options.cellData = cellData;
+				if(perCellFuncFlag){
+					try{
+						let tmp = csvProcessor.perCellFunc(options);
+						// 戻り値が文字列であれば、cellDataを上書き
+						if(typeof tmp === "string"){
+							rowData[cellIndex] = tmp;
+						}
+					}
+					catch(e){
+						console.error(`セルごとに実行する処理の実行に失敗しました。`,e);
+					}
 				}
 			} // セルごと
 		} // 行ごと
 		console.log(csvArray);
 	},
 
-	execUserCode: (userCode)=>{
-		let code= userCode;
-		const func = new Function(code);
-		return func();
+	makeUserFunc: (userCode,options={})=>{
+		let code= `try{\n${userCode}\n}catch(e){console.error(e);}`;
+		let func;
+		try{
+			func = new Function("options",code);
+		}catch(e){
+			console.log("makeUserFunc Failed:",e);
+			return e.message;
+		}
+		return func;
 	},
 
 	viewTable: (csvArray,elem)=>{
