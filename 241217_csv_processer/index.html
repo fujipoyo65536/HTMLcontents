@@ -47,9 +47,9 @@
 							<th>改行文字</th>
 							<td>
 								<select id="inputLineBreakInput" data-option="inputLineBreakSelect">
-									<option value="ALL" selected>CR,LF,CRLF</option>
+									<!-- <option value="ALL" selected>CR,LF,CRLF</option> -->
 									<option value="CR">CR</option>
-									<option value="LF">LF</option>
+									<option value="LF" selected>LF</option>
 									<option value="CRLF">CRLF</option>
 								</select>
 							</td>
@@ -64,7 +64,7 @@
 						</tr>
 						<tr>
 							<th>タイトル行</th>
-							<td><label><input type="checkbox" id="inputIsUsingHeaderCheckbox" data-option="inputIsUsingHeaderCheckbox">先頭行をタイトル行として扱う</label></td>
+							<td><label><input type="checkbox" id="inputIsUsingHeaderCheckbox" data-option="inputIsUsingHeader">先頭行をタイトル行として扱う</label></td>
 						</tr>
 						<tr>
 							<th>囲み文字</th>
@@ -98,25 +98,38 @@
 			</div>
 			<div id="step2" class="stepBox">
 				<h2>Step 2: 処理</h2>
-				<h3>CSVファイル単位での処理</h3>
-				<div id="perCsvProcesses">
-					<div class="perCsvProcess" data-perCsvProcessNum="0" data-perCsvProcessType="csvCode">
+				<h3>入力ファイル単位での処理</h3>
+				<div id="perInputProcesses">
+					<div class="perInputProcess" data-perInputProcessNum="0" data-perInputProcessType="perInputCode">
 						<p>CSVファイルごとに実行する処理を入力</p>
-						<textarea class="code" data-processOption="csvCode"></textarea>
+						<textarea class="code" data-processOption="perInputCode"></textarea>
 					</div>
 				</div>
 				<h3>行ごとに実行する処理</h3>
 				<div id="perRowProcesses">
-					<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="rowCode">
+					<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="perRowCode">
 						<p>行ごとに実行する処理を入力</p>
-						<textarea class="code" data-processOption="rowCode"></textarea>
+						<textarea class="code" data-processOption="perRowCode"></textarea>
 					</div>
 				</div>
 				<h3>セルごとに実行する処理</h3>
+				<p>
+					ここで使える代表的な変数
+					<ul>
+						<li>cellText(=rowArray[cellIndex])：セルの値 ※読み取り専用</li>
+						<li>cellIndex：セル番号</li>
+						<li>rowArray(=csvArray[rowIndex])：行のデータ</li>
+						<li>rowText：行のデータ</li>
+						<li>rowIndex：行番号</li>
+						<li>csvArray：CSVファイルのデータ</li>
+						<li>csvText：CSVファイルのデータ</li>
+						<li>csvProcessor：</li>
+					</ul>
+				</p>
 				<div id="perCellProcesses">
-					<div class="perCellProcess" data-perCellProcessNum="0" data-perCellProcessType="cellCode">
+					<div class="perCellProcess" data-perCellProcessNum="0" data-perCellProcessType="perCellCode">
 						<p>セルごとに実行する処理を入力</p>
-						<textarea class="code" data-processOption="cellCode"></textarea>
+						<textarea class="code" data-processOption="perCellCode"></textarea>
 					</div>
 				</div>
 				対応予定機能

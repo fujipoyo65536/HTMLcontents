@@ -1,6 +1,9 @@
+'use strict';
+
 // todo
 // 列数が合わない行
 // UI調整 折りたたみ
+// 文字コード変換
 
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
@@ -50,13 +53,20 @@ document.addEventListener('DOMContentLoaded', function() {
 	// ファイルが入力されたら、いったん1ファイル目だけを読み込む
 	const fileInput = document.getElementById('selectFileButton');
 	fileInput.addEventListener('change', function(){
-		const file = fileInput.files[0];
+		csvProcessor.inputFiles = [];
+		for(const file of fileInput.files){
+			csvProcessor.inputFiles.push(file);
+		}
+
+		// 1ファイル目をプレビュー
+		const file = csvProcessor.inputFiles[0];
 		const reader = new FileReader();
 		reader.onload = function(){
 			document.getElementById('inputCsvTextInput').value = reader.result.slice(0, 20000);
-			updatePreview();
+			csvProcessor.updatePreview();
 		};
 		reader.readAsText(file);
+		
 	});
 
 
@@ -73,7 +83,7 @@ const csvProcessor = {
 		const limit = document.getElementById('inputPreviewCharLimitInput').value*1;
 		const inputText = options.inputCsvText.slice(0, limit);
 
-		const csvArray = csvProcessor.csvTextToArray(inputText,{
+		const csvTextToArrayResult = csvProcessor.csvTextToArray(inputText,{
 			delimiter: options.inputDelimiter || ',',
 			lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
 			skipRowNumber: options.inputSkipRowNumber || 0,
@@ -86,6 +96,9 @@ const csvProcessor = {
 			isUsingWrapperInWrapper: options.inputIsUsingWrapperInWrapper || false,
 			isUsingLineBreakInWrapper: options.inputIsUsingLineBreakInWrapper || false,
 		});
+
+		const csvArray = csvTextToArrayResult.arrayObj;
+		const rowTextArray = csvTextToArrayResult.rowTextObj;
 
 		// 入力プレビュー
 		const previewTableElement = document.getElementById('inputPreviewTable');
@@ -128,49 +141,94 @@ const csvProcessor = {
 
 	},
 
-	processCsv: (csvArray)=>{
+	processAll: async()=>{
+		const options = csvProcessor.getOptionsFromHtml();
 
-		// 先にユーザー関数の準備
-		let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='cellCode']").value);
-		let perCellFuncFlag
+		// ユーザー関数の準備
+		let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perCellCode']").value);
 		if(typeof perCellFunc === 'function'){
 			csvProcessor.perCellFunc = perCellFunc;
-			perCellFuncFlag = true;
+			csvProcessor.perCellFuncFlag = true;
 		}else if(typeof perCellFunc === 'string'){
 			csvProcessor.perCellFunc = undefined;
 			console.error("セルごとに実行する処理の定義に失敗しました。",perCellFunc);
-			perCellFuncFlag = false;
+			csvProcessor.perCellFuncFlag = false;
 		}
-		
-			
 
+		// 入力ファイルの読み込み
+		csvProcessor.inputFilesText = [];
+		csvProcessor.inputFilesArray = [];
+		csvProcessor.inputFilesRowTextArray = [];
+		for(const [csvIndex,file] of csvProcessor.inputFiles.entries()){
+			const reader = new FileReader();
+			// 同期で読み込み
+			reader.readAsText(file);
+			const csvText = await new Promise((resolve)=>{reader.onload = ()=>{resolve(reader.result)}});
+			console.log(csvText);
+			// 処理
+			csvProcessor.inputFilesText.push(csvText);
+			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvText,{
+				delimiter: options.inputDelimiter || ',',
+				lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
+				skipRowNumber: options.inputSkipRowNumber || 0,
+				skipEmptyRow: options.inputSkipEmptyRow || false,
+				ignoreLastLineBreak: options.inputIgnoreLastLineBreak || false,
+				isUsingHeader: options.inputIsUsingHeader || false,
+				wrapper: options.inputWrapper || '"',
+				isUsingWrapper: options.inputIsUsingWrapper || false,
+				isUsingDelimiterInWrapper: options.inputIsUsingDelimiterInWrapper || false,
+				isUsingWrapperInWrapper: options.inputIsUsingWrapperInWrapper || false,
+				isUsingLineBreakInWrapper: options.inputIsUsingLineBreakInWrapper || false,
+			})
+			const csvArray = csvTextToArrayResult.arrayObj;
+			const rowTextArray = csvTextToArrayResult.rowTextObj;
+			csvProcessor.inputFilesArray.push(csvArray);
+			csvProcessor.inputFilesRowTextArray.push(rowTextArray);
+			csvProcessor.processCsv(csvIndex,csvTextToArrayResult);
+		}
+	},
+
+	processCsv: (csvIndex,csvTextToArrayResult)=>{
+		const csvArray = csvTextToArrayResult.arrayObj;
+		const rowTextArray = csvTextToArrayResult.rowTextObj;
 		const options = csvProcessor.getOptionsFromHtml();
+		const csvText = csvProcessor.inputFilesText[csvIndex];
 		// csvごとに行う処理
-		const perCsvCode = document.querySelector("textarea[data-processOption='csvCode']").value;
-			if(perCsvCode !== ""){
-				// const ret = csvProcessor.execUserCode(perCsvCode);
-				if(ret !== undefined)csvArray = ret;
-			}
 
-		for([rowIndex,rowData] of csvArray.entries()){
-			if(rowData === null)continue;
+
+		for(const [rowIndex,rowArray] of csvArray.entries()){
+			if(rowArray === null)continue;
 			// 行ごとに行う処理
-			const perRowCode = document.querySelector("textarea[data-processOption='rowCode']").value;
-			if(perRowCode !== ""){
-				// const ret = csvProcessor.execUserCode(perRowCode);
-				if(ret !== undefined)csvArray[rowIndex] = ret;
-			}
-
-			for([cellIndex,cellData] of rowData.entries()){
+			const rowText = rowTextArray[rowIndex];
+			for(const [cellIndex,cellText] of rowArray.entries()){
 				// セルごとに行う処理
-				options.cellData = cellData;
-				if(perCellFuncFlag){
+				options.cellText = cellText;
+				if(csvProcessor.perCellFuncFlag){
 					try{
-						let tmp = csvProcessor.perCellFunc(options);
+						let tmp = csvProcessor.perCellFunc({
+							csvIndex,
+							csvText,
+							csvArray,
+							rowIndex,
+							rowArray,
+							rowText,
+							cellIndex,
+							cellText,
+							options,
+							csvProcessor
+						});
 						// 戻り値が文字列であれば、cellDataを上書き
-						if(typeof tmp === "string"){
-							rowData[cellIndex] = tmp;
-						}
+						switch(typeof tmp){
+							case 'string':
+								csvArray[rowIndex][cellIndex] = tmp;
+								break;
+							case 'number':
+								csvArray[rowIndex][cellIndex] = tmp.toString();
+								break;
+							case 'boolean':
+								csvArray[rowIndex][cellIndex] = tmp.toString();
+								break;
+						};
 					}
 					catch(e){
 						console.error(`セルごとに実行する処理の実行に失敗しました。`,e);
@@ -181,11 +239,11 @@ const csvProcessor = {
 		console.log(csvArray);
 	},
 
-	makeUserFunc: (userCode,options={})=>{
-		let code= `try{\n${userCode}\n}catch(e){console.error(e);}`;
+	makeUserFunc: (userCode,args)=>{
+		let code= `try{\n${userCode}\n}catch(e){console.log("userFunc failed:",e.message);console.error(e);}`;
 		let func;
 		try{
-			func = new Function("options",code);
+			func = new Function("a",code);
 		}catch(e){
 			console.log("makeUserFunc Failed:",e);
 			return e.message;
@@ -252,215 +310,224 @@ const csvProcessor = {
 	},
 
 	csvTextToArray: (csvText,options={
-		delimiter:',',
-		lineBreakSelect:'ALL', // ALL,LF,CR,CRLF
-		skipRowNumber:0,
-		skipEmptyRow:false, 
-		ignoreLastLineBreak:false,
-		isUsingHeader:false,
-		wrapper:'"',
-		isUsingWrapper:false,
-		isUsingDelimiterInWrapper:false,
-		isUsingWrapperInWrapper:false,
-		isUsingLineBreakInWrapper:false})=>{
+			delimiter:',',
+			lineBreakSelect:'ALL', // ALL,LF,CR,CRLF
+			skipRowNumber:0,
+			skipEmptyRow:false, 
+			ignoreLastLineBreak:false,
+			isUsingHeader:false,
+			wrapper:'"',
+			isUsingWrapper:false,
+			isUsingDelimiterInWrapper:false,
+			isUsingWrapperInWrapper:false,
+			isUsingLineBreakInWrapper:false})=>{
 
 
-	let lineBreak
-	switch(options.lineBreakSelect){
-		case 'ALL':
-			lineBreak = /[\r\n|\r|\n]/;
-			break;
-		case 'LF':
-			lineBreak = /\n/;
-			break;
-		case 'CR':
-			lineBreak = /\r/;
-			break;
-		case 'CRLF':
-			lineBreak = /\r\n/;
-			break;
-		default:
-			lineBreak = /\n/;
-			break;
-	}
+		let lineBreak
+		switch(options.lineBreakSelect){
+			case 'ALL':
+				lineBreak = /[\r\n|\r|\n]/;
+				break;
+			case 'LF':
+				lineBreak = /\n/;
+				break;
+			case 'CR':
+				lineBreak = /\r/;
+				break;
+			case 'CRLF':
+				lineBreak = /\r\n/;
+				break;
+			default:
+				lineBreak = /\n/;
+				break;
+		}
 
 
-	//入力末尾の改行を消す
-	if(options.ignoreLastLineBreak){
-		csvText = csvText.replace(/[\r\n|\r|\n]$/, '');
-	}
+		//入力末尾の改行を消す
+		if(options.ignoreLastLineBreak){
+			csvText = csvText.replace(/[\r\n|\r|\n]$/, '');
+		}
 
-	const rows = csvText.split(lineBreak);
+		const rows = csvText.split(lineBreak);
 
-	// 先頭行を読み飛ばして捨てる
-	for(let i = 0; i < options.skipRowNumber; i++){
-		rows.shift();
-	}
+		// 先頭行を読み飛ばして捨てる
+		for(let i = 0; i < options.skipRowNumber; i++){
+			rows.shift();
+		}
 
 
-	// 処理モードの決定(データの複雑さによる)
-	// 1:最初に改行で分割し、その後デリミタで分割していいもの
-	// 2:最初に改行で分割するが、先頭から各セルを判断する必要があるもの
-	// 3:すべて1文字ずつ処理するもの
+		// 処理モードの決定(データの複雑さによる)
+		// 1:最初に改行で分割し、その後デリミタで分割していいもの
+		// 2:最初に改行で分割するが、先頭から各セルを判断する必要があるもの
+		// 3:すべて1文字ずつ処理するもの
 
-	let readingMode
-	if(!options.isUsingWrapper){
-		readingMode = 1;
-	}else if(options.isUsingLineBreakInWrapper){
-		readingMode = 3;
-	}else if(options.isUsingDelimiterInWrapper){
-		readingMode = 2;
-	}else{
-		readingMode = 1;
-	}
+		let readingMode
+		if(!options.isUsingWrapper){
+			readingMode = 1;
+		}else if(options.isUsingLineBreakInWrapper){
+			readingMode = 3;
+		}else if(options.isUsingDelimiterInWrapper){
+			readingMode = 2;
+		}else{
+			readingMode = 1;
+		}
 
-	document.getElementById('readingModeView').textContent = `[debug]読み取りモード:${readingMode}`;//★
+		document.getElementById('readingModeView').textContent = `[debug]読み取りモード:${readingMode}`;//★
 
-	let result=[];
-	switch(readingMode){
-		case 1:
-			{
-				if(!options.isUsingHeader){
-					result[0] = null;
-				}
-				// それ以外の行を格納
-				for(let i = 0; i < rows.length; i++){
-					const rowData = rows[i].split(options.delimiter);
-					if(options.skipEmptyRow && rowData.length == 1 && rowData[0] == ""){
-						//行が空の場合はスキップ
-						continue;
+		let arrayObj=[];
+		let rowTextObj=[];
+		switch(readingMode){
+			case 1:
+				{
+					if(!options.isUsingHeader){
+						arrayObj[0] = null;
+						rowTextObj[0] = null;
 					}
+					// それ以外の行を格納
+					for(let i = 0; i < rows.length; i++){
+						rowTextObj.push(rows[i]);
+						const rowData = rows[i].split(options.delimiter);
+						if(options.skipEmptyRow && rowData.length == 1 && rowData[0] == ""){
+							//行が空の場合はスキップ
+							continue;
+						}
+						let row = [];
+						for(let j = 0; j < rowData.length; j++){
+							const cellData = rowData[j];
+							let cell = cellData;
+							// 両側の空白を削除
+							cell = cell.trim();
+							if(options.isUsingWrapper){
+								// 両側の囲み文字を削除(囲み文字に両側を囲まれている場合のみ)
+								// 両側が囲み文字かを確認
+								if(cell.startsWith(options.wrapper) && cell.endsWith(options.wrapper)){
+									// 両側を削除
+									cell = cell.slice(1, -1);
+									if(options.isUsingWrapperInWrapper){
+										// 囲み文字の中の囲み文字をエスケープ
+										cell = cell.replace(new RegExp(options.wrapper + options.wrapper, 'g'), options.wrapper);
+									}
+								}								
+							}
+							// 結果に追加
+							row.push(cell);
+						}
+						arrayObj.push(row);
+					}
+				}
+				break;
+
+			case 2:
+				// 今作っていないのでレベル3で処理
+			case 3:
+				{
+					let splitText;
+					if(options.skipRowNumber > 0){
+						splitText = rows.join("\n")
+					}else{
+						splitText = csvText.split("");
+					}
+					if(!options.isUsingHeader){
+						arrayObj[0] = null;
+						rowTextObj[0] = null;
+					}
+					let cell = "";
 					let row = [];
-					for(let j = 0; j < rowData.length; j++){
-						const cellData = rowData[j];
-						let cell = cellData;
-						// 両側の空白を削除
-						cell = cell.trim();
-						if(options.isUsingWrapper){
-							// 両側の囲み文字を削除(囲み文字に両側を囲まれている場合のみ)
-							// 両側が囲み文字かを確認
-							if(cell.startsWith(options.wrapper) && cell.endsWith(options.wrapper)){
-								// 両側を削除
-								cell = cell.slice(1, -1);
-								if(options.isUsingWrapperInWrapper){
-									// 囲み文字の中の囲み文字をエスケープ
-									cell = cell.replace(new RegExp(options.wrapper + options.wrapper, 'g'), options.wrapper);
-								}
-							}								
-						}
-						// 結果に追加
-						row.push(cell);
-					}
-					result.push(row);
-				}
-			}
-			break;
-
-		case 2:
-			// 今作っていないのでレベル3で処理
-		case 3:
-			{
-				let splitText;
-				if(options.skipRowNumber > 0){
-					splitText = rows.join("\n")
-				}else{
-					splitText = csvText.split("");
-				}
-				if(!options.isUsingHeader){
-					result[0] = null;
-				}
-				let cell = "";
-				let row = [];
-				// ステータス関係
-				let afterDelimiter = false;
-				let afterLineBreak = true;
-				let inWrapper = false;
-				let afterWrapperCharacter = false; //ラッパー内でラッパーが1つ出てきたとき
-				
-				for(let i = 0; i < splitText.length; i++){
-					const char = splitText[i];
-					const lineBreakMatch = (char.match(lineBreak)||[null])[0];
-					// ここから1文字ずつ処理していく
-					if(inWrapper){
-						switch(char){
-							case options.wrapper:
-								if(afterWrapperCharacter){
+					let rowText = "";
+					// ステータス関係
+					let afterDelimiter = false;
+					let afterLineBreak = true;
+					let inWrapper = false;
+					let afterWrapperCharacter = false; //ラッパー内でラッパーが1つ出てきたとき
+					
+					for(let i = 0; i < splitText.length; i++){
+						rowText += splitText[i];
+						const char = splitText[i];
+						const lineBreakMatch = (char.match(lineBreak)||[null])[0];
+						// ここから1文字ずつ処理していく
+						if(inWrapper){
+							switch(char){
+								case options.wrapper:
+									if(afterWrapperCharacter){
+										afterWrapperCharacter = false;
+										cell += char;
+									}else{
+										afterWrapperCharacter = true;
+									}
+									break;
+								case options.delimiter:
+									if(afterWrapperCharacter){
+										inWrapper = false;
+									}else{
+										cell += char;
+									}
 									afterWrapperCharacter = false;
+									break;
+								case lineBreakMatch:
+									if(afterWrapperCharacter){
+										inWrapper = false;
+									}else{
+										cell += char;
+									}
+									afterWrapperCharacter = false;
+									break;
+								default:
 									cell += char;
-								}else{
-									afterWrapperCharacter = true;
-								}
-								break;
-							case options.delimiter:
-								if(afterWrapperCharacter){
-									inWrapper = false;
-								}else{
-									cell += char;
-								}
-								afterWrapperCharacter = false;
-								break;
-							case lineBreakMatch:
-								if(afterWrapperCharacter){
-									inWrapper = false;
-								}else{
-									cell += char;
-								}
-								afterWrapperCharacter = false;
-								break;
-							default:
-								cell += char;
-								afterWrapperCharacter = false;
-								break;
+									afterWrapperCharacter = false;
+									break;
+							}
 						}
-					}
-					if(!inWrapper){
-						switch(char){
-							case options.wrapper:
-								// ラッパーの外でラッパー文字が出てきたらおかしい。が淡々と追加
-								if(afterDelimiter || afterLineBreak){
-									inWrapper = true;
-								}else{
-									cell += char;
-								}
-								break;
-							case options.delimiter:
-								// デリミターが出てきたらセルを追加
-								row.push(cell);
-								cell = "";
-								afterDelimiter = true;
-								break;
-							case lineBreakMatch:
-								if(!afterLineBreak || !options.skipEmptyRow){ // 連続する改行は無視
-									// 改行が出てきたらセルを追加して行を追加
+						if(!inWrapper){
+							switch(char){
+								case options.wrapper:
+									// ラッパーの外でラッパー文字が出てきたらおかしい。が淡々と追加
+									if(afterDelimiter || afterLineBreak){
+										inWrapper = true;
+									}else{
+										cell += char;
+									}
+									break;
+								case options.delimiter:
+									// デリミターが出てきたらセルを追加
 									row.push(cell);
-									result.push(row);
-									row = [];
 									cell = "";
-									afterLineBreak = true;
-								}
-								break;
-							default:
-								cell += char;
-								break;
-						}
-						if(char != options.delimiter){
-							afterDelimiter = false
-						};
-						if(char != lineBreakMatch){
-							afterLineBreak = false
-						};
-						afterWrapperCharacter = false;
-					}//if(inWrapper)
-				}//1文字ずつ
-				
-				// 最後のセルを追加
-				row.push(cell);
-				result.push(row);
-			}
-			break;
+									afterDelimiter = true;
+									break;
+								case lineBreakMatch:
+									if(!afterLineBreak || !options.skipEmptyRow){ // 連続する改行は無視
+										// 改行が出てきたらセルを追加して行を追加
+										row.push(cell);
+										arrayObj.push(row);
+										row = [];
+										cell = "";
+										rowTextObj.push(rowText);
+										rowText = "";
+										afterLineBreak = true;
+									}
+									break;
+								default:
+									cell += char;
+									break;
+							}
+							if(char != options.delimiter){
+								afterDelimiter = false
+							};
+							if(char != lineBreakMatch){
+								afterLineBreak = false
+							};
+							afterWrapperCharacter = false;
+						}//if(inWrapper)
+					}//1文字ずつ
+					
+					// 最後のセルを追加
+					row.push(cell);
+					arrayObj.push(row);
+					rowTextObj.push(rowText);
+				}
+				break;
 		}//switch
-		console.log(result);
-		return result; 
+		console.log(arrayObj);
+		return {arrayObj,rowTextObj};
 	},
 
 	arrayToCsvText: (array,options={
@@ -476,9 +543,9 @@ const csvProcessor = {
 
 	// 先に、すべてのセルの特殊文字をチェック・置換
 	if(options.isUsingWrapper && (options.isUsingSpecialCharacterInWrapper||options.isUsingWrapperAll) ){
-		for([rowIndex,row] of array.entries()){
+		for(const [rowIndex,row] of array.entries()){
 			if(row === null)continue;
-			for([cellIndex,cell] of row.entries()){
+			for(const [cellIndex,cell] of row.entries()){
 				if(options.isUsingWrapperAll || (cell.includes(options.wrapper)||cell.includes(options.delimiter)||cell.includes("\n")||cell.includes("\r"))){ // 安全のため、CR・LFのいずれかがある場合はエスケープ
 					array[rowIndex][cellIndex] = `${options.wrapper}${cell.replace(new RegExp(options.wrapper, 'g'), options.wrapper + options.wrapper)}${options.wrapper}`;
 				}
@@ -496,7 +563,7 @@ const csvProcessor = {
 	}
 
 	// データ行を追加
-	for(row=1; row<array.length; row++){
+	for(let row=1; row<array.length; row++){
 		result += array[row].join(options.delimiter) + options.lineBreak;
 	}
 
