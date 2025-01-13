@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>CSV Processor</title>
 	<link rel="stylesheet" href="csvProcessor.css">
+	<script src="encoding.js-master/encoding.min.js"></script>
 	<script src="csvProcessor.js"></script>
 </head>
 <body>
@@ -26,7 +27,10 @@
 						<button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
 					</label>
 					<label class="optionBox">
-						読み込み対象とする拡張子:<input type="text" id="inputFileExtensionInput" value=".csv" style="width: 5em;" disabled data-option="inputFileExtension"></label><button id="directoryReloadButton" disabled>再読込</button>
+						読み込みフィルタ(RegExp):<input type="text" id="inputFileRegExpInput" value=".csv$" style="width: 5em;" disabled data-option="inputFileRegExp">
+					</label>
+					<button id="directoryReloadButton" disabled>再読込</button>
+					<span id="inputDirectoryStatusText">－</span>
 					</div>
 					<div class="optionSet">
 						<label class="optionBox"><input type="radio" name="inputMethod" value="direct" data-option="inputMethod"> 直接入力</label><br>
@@ -40,17 +44,31 @@
 					プレビューを見ながら、正常に読み込まれるように設定してください。<br>
 					<table id="inputOptionTable">
 						<tr>
+							<th>文字コード</th>
+							<td>
+								<select id="inputEncodingSelect" data-option="inputEncoding">
+									<option value="utf-8" selected>UTF-8</option>
+									<option value="shift-jis">Shift_JIS</option>
+									<option value="euc-jp">EUC-JP</option>
+									<option value="iso-2022-jp">ISO-2022-JP</option>
+									<option value="utf-16be">UTF-16be</option>
+									<option value="utf-16le">UTF-16le</option>
+									<option value="AUTO">自動判定(低速)</option>
+								</select>
+						</tr>
+						<tr>
 							<th>区切り文字</th>
 							<td><label>区切り文字：<input type="text" id="inputDelimiterInput" value="," style="width: 3em;" data-option="inputDelimiter"></label></td>
 						</tr>
 						<tr>
 							<th>改行文字</th>
 							<td>
+								「CRLF」で正常に読み込めない場合のみ変更してください。<br>
 								<select id="inputLineBreakInput" data-option="inputLineBreakSelect">
 									<!-- <option value="ALL" selected>CR,LF,CRLF</option> -->
+									<option value="CRLF"selected>CRLF</option>
 									<option value="CR">CR</option>
-									<option value="LF" selected>LF</option>
-									<option value="CRLF">CRLF</option>
+									<option value="LF">LF</option>
 								</select>
 							</td>
 						</tr>
@@ -99,36 +117,53 @@
 			<div id="step2" class="stepBox">
 				<h2>Step 2: 処理</h2>
 				<h3>入力ファイル単位での処理</h3>
+				<p>
+					ここで使える変数
+				<ul>
+					<li>csvArray：CSVファイルのデータ 基本的にはこれを書き換える</li>
+					<li>csvText：CSVファイルのデータ ※読み取り専用</li>
+					<li>csvProcessor：</li>
+				</ul>
+				</p>
 				<div id="perInputProcesses">
 					<div class="perInputProcess" data-perInputProcessNum="0" data-perInputProcessType="perInputCode">
-						<p>CSVファイルごとに実行する処理を入力</p>
 						<textarea class="code" data-processOption="perInputCode"></textarea>
 					</div>
 				</div>
 				<h3>行ごとに実行する処理</h3>
+				<p>
+					ここで使える変数
+				<ul>
+					<li>rowArray：行のデータ 基本的にはこれを書き換える 要素の数を変えてもOK</li>
+					<li>rowText：行のデータ ※読み取り専用</li>
+					<li>rowIndex：行番号 ※読み取り専用</li>
+					<li>csvArray：CSVファイルのデータ</li>
+					<li>csvText：CSVファイルのデータ ※読み取り専用</li>
+					<li>csvProcessor：</li>
+				</ul>
+				</p>
 				<div id="perRowProcesses">
 					<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="perRowCode">
-						<p>行ごとに実行する処理を入力</p>
 						<textarea class="code" data-processOption="perRowCode"></textarea>
 					</div>
 				</div>
 				<h3>セルごとに実行する処理</h3>
 				<p>
-					ここで使える代表的な変数
+					ここで使える変数
 					<ul>
-						<li>cellText(=rowArray[cellIndex])：セルの値 ※読み取り専用</li>
-						<li>cellIndex：セル番号</li>
+						<li>cellText(=rowArray[cellIndex])：セルの値 ※この変数は読み取り専用 代わりに、return
+							で値を返すことで書き換えることができる</li>
+						<li>cellIndex：セル番号 ※読み取り専用</li>
 						<li>rowArray(=csvArray[rowIndex])：行のデータ</li>
-						<li>rowText：行のデータ</li>
-						<li>rowIndex：行番号</li>
+						<li>rowText：行のデータ ※読み取り専用</li>
+						<li>rowIndex：行番号 ※読み取り専用</li>
 						<li>csvArray：CSVファイルのデータ</li>
-						<li>csvText：CSVファイルのデータ</li>
+						<li>csvText：CSVファイルのデータ ※読み取り専用</li>
 						<li>csvProcessor：</li>
 					</ul>
 				</p>
 				<div id="perCellProcesses">
 					<div class="perCellProcess" data-perCellProcessNum="0" data-perCellProcessType="perCellCode">
-						<p>セルごとに実行する処理を入力</p>
 						<textarea class="code" data-processOption="perCellCode"></textarea>
 					</div>
 				</div>
@@ -160,11 +195,26 @@
 					<textarea id="csvTextOutputTextarea" rows="10" cols="50" placeholder="ここに出力が表示されます"></textarea>
 				</div>
 				<div class="optionSet">
-					<label class="optionBox"><input type="radio" name="outputMethod" value="directory" checked data-option="outputMethod"> フォルダに出力</label><button id="outputDirectorySelectButton" disabled>フォルダを選択</button>
+					<label class="optionBox"><input type="radio" name="outputMethod" value="directory" checked data-option="outputMethod"> フォルダに出力</label>
+					<button id="outputDirectorySelectButton">フォルダを選択</button>
+					<span id="outputDirectoryStatusText">－</span>
 				</div>
 				
 				<h3>出力オプション</h3>
 				<table id="outputOptionTable">
+					<tr>
+						<th>文字コード</th>
+						<td>
+							<select id="outputEncodingSelect" data-option="outputEncoding">
+								<option value="UTF-8" selected>UTF-8</option>
+								<option value="SJIS">Shift_JIS</option>
+								<option value="EUCJP">EUC-JP</option>
+								<option value="JIS">ISO-2022-JP</option>
+								<!-- <option value="UTF16">UTF-16</option> -->
+								<option value="UTF16BE">UTF-16be</option>
+								<option value="UTF16LE">UTF-16le</option>
+							</select>
+						</td>
 					<tr>
 						<th>区切り文字</th>
 						<td><label>区切り文字：<input type="text" id="outputDelimiterInput" value="," style="width: 3em;" data-option="outputDelimiter"></label></td>
@@ -216,7 +266,7 @@
 
 				<h3>出力ファイル設定</h3>
 				<div class="optionBox">ファイル名(振分・抽出)：<br>
-					<textarea id="outputFileNameInput" rows="2" cols="50" placeholder="出力ファイル名を入力してください" data-option="outputFileName"></textarea>
+					<textarea id="outputFileNameCodeInput" rows="2" cols="50" placeholder="出力ファイル名を返すコードを入力" data-option="outputFileNameCode">return ["output.csv"]</textarea>
 				</div>
 				<!-- 自動連番にも対応する -->
 				<!-- 正規表現にも対応する -->
@@ -236,6 +286,9 @@
 					</span>
 				</div>
 				<div id="outputButton">ファイル出力</div>
+				<div id="outputStatusTextBox">
+					<span id="outputStatusText">ここに出力状況が表示されます。</span>
+				</div>
 			</div>
 		</div>
 	</body>

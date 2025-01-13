@@ -1,9 +1,10 @@
 'use strict';
 
 // todo
+// 進捗状況表示
 // 列数が合わない行
 // UI調整 折りたたみ
-// 文字コード変換
+// ディレクトリの書き出し
 
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
@@ -12,7 +13,12 @@ document.addEventListener('DOMContentLoaded', function() {
 	const inputElements = document.querySelectorAll('input,textarea,select');
 	inputElements.forEach(function(element) {
 		element.addEventListener('input', function(){
-			csvProcessor.updatePreview();
+			// inputEncodingSelectに変更があった場合はファイルをリロードする
+			if(element.id == 'inputEncodingSelect'){
+				csvProcessor.loadAndUpdatePreview();
+			}else{
+				csvProcessor.updatePreview();
+			}
 		});
 	});
 
@@ -24,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
 				case 'file':
 					document.getElementById('selectFileButton').disabled = false;
 					document.getElementById('inputDirectorySelectButton').disabled = true;
-					document.getElementById('inputFileExtensionInput').disabled = true;
+					document.getElementById('inputFileRegExpInput').disabled = true;
 					document.getElementById('directoryReloadButton').disabled = true;
 					document.getElementById('inputCsvTextInput').disabled = true;
 					break;
@@ -32,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
 				case 'directory':
 					document.getElementById('selectFileButton').disabled = true;
 					document.getElementById('inputDirectorySelectButton').disabled = false;
-					document.getElementById('inputFileExtensionInput').disabled = false;
+					document.getElementById('inputFileRegExpInput').disabled = false;
 					document.getElementById('directoryReloadButton').disabled = false;
 					document.getElementById('inputCsvTextInput').disabled = true;
 					break;
@@ -40,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
 				case 'direct':
 					document.getElementById('selectFileButton').disabled = true;
 					document.getElementById('inputDirectorySelectButton').disabled = true;
-					document.getElementById('inputFileExtensionInput').disabled = true;
+					document.getElementById('inputFileRegExpInput').disabled = true;
 					document.getElementById('directoryReloadButton').disabled = true;
 					document.getElementById('inputCsvTextInput').disabled = false;
 					break;
@@ -50,38 +56,108 @@ document.addEventListener('DOMContentLoaded', function() {
 	inputMethodElements[0].dispatchEvent(new Event('change'));
 
 
-	// ファイルが入力されたら、いったん1ファイル目だけを読み込む
+	// ファイル入力イベント
 	const fileInput = document.getElementById('selectFileButton');
 	fileInput.addEventListener('change', function(){
 		csvProcessor.inputFiles = [];
 		for(const file of fileInput.files){
-			csvProcessor.inputFiles.push(file);
+			csvProcessor.inputFiles.push({name:file.name,fileObj:file});
 		}
-
-		// 1ファイル目をプレビュー
-		const file = csvProcessor.inputFiles[0];
-		const reader = new FileReader();
-		reader.onload = function(){
-			document.getElementById('inputCsvTextInput').value = reader.result.slice(0, 20000);
-			csvProcessor.updatePreview();
-		};
-		reader.readAsText(file);
-		
+		csvProcessor.loadAndUpdatePreview();
 	});
+
+	// ディレクトリ選択ボタンが押されたら、ディレクトリ選択ダイアログを開く
+	const inputDirectorySelectButton = document.getElementById('inputDirectorySelectButton');
+	inputDirectorySelectButton.addEventListener('click', async function(){
+		csvProcessor.inputDirectoryHandle = await window.showDirectoryPicker();
+
+		// ディレクトリ内で条件にあうファイルを検索(再帰的に)
+		const searchRegExp = new RegExp(document.getElementById('inputFileRegExpInput').value);
+		const searchFiles = async (directoryHandle,currentPath,searchRegExp) => {
+			const files = [];
+			// if(!currentPath)currentPath = `${directoryHandle.name}`;
+			if(!currentPath)currentPath = "./";
+			for await (const entry of directoryHandle.values()) {
+				if(entry.kind === 'file' && searchRegExp.test(entry.name)){
+					files.push({path:`${currentPath}${entry.name}`,name:entry.name,entry,fileObj:await entry.getFile()});
+				}else if(entry.kind === 'directory'){
+					const subFiles = await searchFiles(entry,`${currentPath}${entry.name}/`,searchRegExp);
+					files.push(...subFiles);
+				}
+			}
+			return files;
+		};
+		const files = await searchFiles(csvProcessor.inputDirectoryHandle,null,searchRegExp)
+		csvProcessor.inputFiles = files;
+		console.log(`${files.length} 件のファイルが見つかりました。`,files);
+		csvProcessor.changeStatusText("inputDirectory",`${files.length} 件のファイルが見つかりました。`);
+		csvProcessor.loadAndUpdatePreview();
+	});
+
+	// 出力ディレクトリ選択ボタンが押されたら、ディレクトリ選択ダイアログを開く
+	const outputDirectorySelectButton = document.getElementById('outputDirectorySelectButton');
+	outputDirectorySelectButton.addEventListener('click', async function(){
+		csvProcessor.outputDirectoryHandle = await window.showDirectoryPicker();
+		csvProcessor.changeStatusText("outputDirectory",`出力ディレクトリが設定されました:${csvProcessor.outputDirectoryHandle.name}`);
+	});
+
+	// 出力ボタン
+	const outputButton = document.getElementById('outputButton');
+	outputButton.addEventListener('click', async function(){
+		csvProcessor.processAll();
+	});
+	
+
+
 
 
 	//デバッグ用
 	document.getElementById('inputCsvTextInput').value = '列A,列B,列C\n1,2,3\n4,5,6,一列多い例\n7,8,9次行は空行\n\n"セル内に→""←セミコロン","セル内に→\n←改行","セル内に→,←カンマ"\n10,一列少ない例\n11,12,末尾に改行\n';
 	csvProcessor.updatePreview();
+	
 });
 
 const csvProcessor = {
+
+	settings:{
+		outputBufferSize : 100_000_000, // 100M
+	},
+
+	loadAndUpdatePreview: async()=>{
+		// 1ファイル目をプレビュー
+		const options = csvProcessor.getOptionsFromHtml();
+		const file = csvProcessor.inputFiles[0].fileObj;
+		const reader = new FileReader();
+		reader.onload = function(){
+			const uint8Array = new Uint8Array(reader.result);
+			const inputEncoding = options.inputEncoding;
+			let text;
+			if(inputEncoding == 'AUTO'){
+				const unicodeArray = Encoding.convert(uint8Array, {to: 'UNICODE',from: 'AUTO'});
+				text = Encoding.codeToString(unicodeArray);
+			}else{
+				const decoder = new TextDecoder(inputEncoding);
+				text = decoder.decode(uint8Array);
+			}
+			document.getElementById('inputCsvTextInput').value = text.slice(0, 100000);
+			csvProcessor.temporaryInputText = text;
+			csvProcessor.updatePreview();
+		};
+		reader.readAsArrayBuffer(file);
+	},
 
 	updatePreview: ()=>{
 		const options = csvProcessor.getOptionsFromHtml();
 
 		const limit = document.getElementById('inputPreviewCharLimitInput').value*1;
-		const inputText = options.inputCsvText.slice(0, limit);
+		// const inputText = options.inputCsvText.slice(0, limit);
+		const selectedInputMethod = document.querySelector('input[name="inputMethod"]:checked').value;
+		let inputText;
+		if (selectedInputMethod === 'file' || selectedInputMethod === 'directory') {
+			inputText = (csvProcessor.temporaryInputText||"").slice(0, limit);
+		} else {
+			inputText = document.getElementById('inputCsvTextInput').value.slice(0, limit);
+		}
 
 		const csvTextToArrayResult = csvProcessor.csvTextToArray(inputText,{
 			delimiter: options.inputDelimiter || ',',
@@ -142,30 +218,120 @@ const csvProcessor = {
 	},
 
 	processAll: async()=>{
-		const options = csvProcessor.getOptionsFromHtml();
+		console.log("processAll Started");
+		csvProcessor.changeStatusText("output","処理開始");
 
+		const options = csvProcessor.getOptionsFromHtml();
+		csvProcessor.options = options;
+		csvProcessor.headerText = null;
+
+		if(!csvProcessor.outputDirectoryHandle){
+			csvProcessor.dialog("出力ディレクトリが選択されていません。");
+			csvProcessor.changeStatusText("output","出力ディレクトリが選択されていません。");
+			return;
+		}
+
+		let lineBreak
+		switch(options.outputLineBreakSelect){
+			case 'LF':
+				csvProcessor.options.outputLineBreak = '\n';
+				break;
+			case 'CR':
+				csvProcessor.options.outputLineBreak = '\r';
+				break;
+			case 'CRLF':
+				csvProcessor.options.outputLineBreak = '\r\n';
+				break;
+			default:
+				csvProcessor.options.outputLineBreak = '\n';
+				break;
+		}
+		// csvProcessor.outputFilesWriteableStream = []; ★
+		
 		// ユーザー関数の準備
+		// 入力ファイルごとに実行する処理
+		let perInputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perInputCode']").value);
+		if(typeof perInputFunc === 'function'){
+			csvProcessor.perInputFunc = perInputFunc;
+			csvProcessor.perInputFuncFlag = true;
+		}else if(typeof perInputFunc === 'string'){
+			csvProcessor.perInputFunc = undefined;
+			console.log("入力ファイルごとに実行する処理は定義されませんでした",perInputFunc);
+			csvProcessor.perInputFuncFlag = false;
+		}
+
+		// 行ごとに実行する処理
+		let perRowFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perRowCode']").value);
+		if(typeof perRowFunc === 'function'){
+			csvProcessor.perRowFunc = perRowFunc;
+			csvProcessor.perRowFuncFlag = true;
+		}else if(typeof perRowFunc === 'string'){
+			csvProcessor.perRowFunc = undefined;
+			console.log("行ごとに実行する処理は定義されませんでした",perRowFunc);
+			csvProcessor.perRowFuncFlag = false;
+		}
+		
+		// セルごとに実行する処理
 		let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perCellCode']").value);
 		if(typeof perCellFunc === 'function'){
 			csvProcessor.perCellFunc = perCellFunc;
 			csvProcessor.perCellFuncFlag = true;
 		}else if(typeof perCellFunc === 'string'){
 			csvProcessor.perCellFunc = undefined;
-			console.error("セルごとに実行する処理の定義に失敗しました。",perCellFunc);
+			console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
 			csvProcessor.perCellFuncFlag = false;
 		}
+
+		// 出力ファイル名を設定する処理
+		let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode);
+		if(typeof outputFileNameFunc === 'function'){
+			csvProcessor.outputFileNameFunc = outputFileNameFunc;
+			csvProcessor.outputFileNameFuncFlag = true;
+		}else if(typeof outputFileNameFunc === 'string'){
+			csvProcessor.outputFileNameFunc = undefined;
+			console.log("出力ファイル名を設定する処理は定義されませんでした",outputFileNameFunc);
+			csvProcessor.outputFileNameFuncFlag = false;
+		}
+
+
 
 		// 入力ファイルの読み込み
 		csvProcessor.inputFilesText = [];
 		csvProcessor.inputFilesArray = [];
 		csvProcessor.inputFilesRowTextArray = [];
+		
+		if(!csvProcessor.inputFiles || csvProcessor.inputFiles.length == 0){
+			csvProcessor.dialog("入力ファイルが選択されていません。");
+			return;
+		}
 		for(const [csvIndex,file] of csvProcessor.inputFiles.entries()){
+			console.log(`input file loading: ${csvIndex}`,file);
+			csvProcessor.changeStatusText("output",`ファイル読み込み中: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
+
+			//ファイル読み込みパート
+			const fileObj = file.fileObj;
 			const reader = new FileReader();
+
 			// 同期で読み込み
-			reader.readAsText(file);
-			const csvText = await new Promise((resolve)=>{reader.onload = ()=>{resolve(reader.result)}});
-			console.log(csvText);
-			// 処理
+			let csvText;
+			if(options.inputEncoding == 'AUTO'){ // Encoding.jsを使って自動判定
+				reader.readAsArrayBuffer(fileObj);
+				csvText = await new Promise((resolve)=>{reader.onload = ()=>{
+					const uint8Array = new Uint8Array(reader.result);
+					const unicodeText = Encoding.convert(uint8Array, {to: 'UNICODE',from: 'AUTO',type: 'string'});
+					resolve(unicodeText);
+				}});
+			}else{
+				reader.readAsText(fileObj);
+				csvText = await new Promise((resolve)=>{reader.onload = ()=>{resolve(reader.result)}});
+			}
+			// 閉じる
+			reader.abort();
+
+			console.log(`input file loaded: ${csvIndex}`,file);
+			csvProcessor.changeStatusText("output",`ファイル読み込み完了 加工処理開始: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
+
+			// 処理パート
 			csvProcessor.inputFilesText.push(csvText);
 			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvText,{
 				delimiter: options.inputDelimiter || ',',
@@ -180,32 +346,85 @@ const csvProcessor = {
 				isUsingWrapperInWrapper: options.inputIsUsingWrapperInWrapper || false,
 				isUsingLineBreakInWrapper: options.inputIsUsingLineBreakInWrapper || false,
 			})
+
+			console.log(`input file processed: ${csvIndex}`,file);
+			csvProcessor.changeStatusText("output",`ファイル加工処理完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
+
 			const csvArray = csvTextToArrayResult.arrayObj;
 			const rowTextArray = csvTextToArrayResult.rowTextObj;
 			csvProcessor.inputFilesArray.push(csvArray);
 			csvProcessor.inputFilesRowTextArray.push(rowTextArray);
-			csvProcessor.processCsv(csvIndex,csvTextToArrayResult);
-		}
+			// 処理と書き込み
+			const csvArrayAfterProcess = await csvProcessor.processCsv(csvIndex,csvTextToArrayResult);
+			// console.log(csvArrayAfterProcess);
+			csvProcessor.changeStatusText("output",`ファイルのすべての処理が完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
+		}// inputFileごと
+		await csvProcessor.closeAllOutputStream();
+		console.log("processAll Finished");
+		csvProcessor.changeStatusText("output","すべての処理が完了");
 	},
 
-	processCsv: (csvIndex,csvTextToArrayResult)=>{
+	processCsv: async(csvIndex,csvTextToArrayResult)=>{
+		const csvFile = csvProcessor.inputFiles[csvIndex];
+		console.log(`processCsv Started: ${csvIndex}`,csvFile);
 		const csvArray = csvTextToArrayResult.arrayObj;
 		const rowTextArray = csvTextToArrayResult.rowTextObj;
-		const options = csvProcessor.getOptionsFromHtml();
+		const options = csvProcessor.options;
 		const csvText = csvProcessor.inputFilesText[csvIndex];
 		// csvごとに行う処理
-
-
-		for(const [rowIndex,rowArray] of csvArray.entries()){
+		// ユーザー処理
+		if(csvProcessor.perInputFuncFlag){
+			try{
+				let tmp = csvProcessor.perInputFunc({
+					file: csvFile,
+					fileObj: csvFile.fileObj,
+					csvIndex,
+					csvText,
+					csvArray,
+					options,
+					csvProcessor
+				});
+			}
+			catch(e){
+				console.error(`入力ファイルごとに実行する処理の実行に失敗しました。`,e);
+			}
+		}
+		for(let [rowIndex,rowArray] of csvArray.entries()){
 			if(rowArray === null)continue;
 			// 行ごとに行う処理
 			const rowText = rowTextArray[rowIndex];
+			// ユーザー処理
+			if(csvProcessor.perRowFuncFlag){
+				try{
+					let tmp = csvProcessor.perRowFunc({
+						file: csvFile,
+						fileObj: csvFile.fileObj,
+						csvIndex,
+						csvText,
+						csvArray,
+						rowIndex,
+						rowArray,
+						rowText,
+						options,
+						csvProcessor
+					});
+					if (Array.isArray(tmp)) {
+						// csvArray[rowIndex] = tmp;
+						rowArray = tmp;
+					}
+				}
+				catch(e){
+					console.error(`行ごとに実行する処理の実行に失敗しました。`,e);
+				}
+			}
 			for(const [cellIndex,cellText] of rowArray.entries()){
 				// セルごとに行う処理
-				options.cellText = cellText;
+				// ユーザー処理
 				if(csvProcessor.perCellFuncFlag){
 					try{
 						let tmp = csvProcessor.perCellFunc({
+							file: csvFile,
+							fileObj: csvFile.fileObj,
 							csvIndex,
 							csvText,
 							csvArray,
@@ -235,11 +454,155 @@ const csvProcessor = {
 					}
 				}
 			} // セルごと
+
+			// 出力
+			const outputText = csvProcessor.rowArrayToCsvText(rowArray,{
+				delimiter: options.outputDelimiter || ',',
+				lineBreak: options.outputLineBreak || '\n',
+				isUsingHeader: options.outputIsUsingHeader || false,
+				wrapper: options.outputWrapper || '"',
+				isUsingWrapper: options.outputIsUsingWrapper || false,
+				isUsingWrapperAll: options.outputIsUsingWrapperAll || false,
+				isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
+				addLastLineBreak: options.outputAddLastLineBreak || false,
+			});
+			if(rowIndex == 0){
+				if(!csvProcessor.headerText){
+					csvProcessor.headerText = outputText;
+				}
+			}else{
+
+				let outputFileNames = ["output.csv"];
+				if(csvProcessor.outputFileNameFuncFlag){
+					try{
+						let tmp = csvProcessor.outputFileNameFunc({
+							file: csvFile,
+							fileObj: csvFile.fileObj,
+							csvIndex,
+							csvText,
+							csvArray,
+							rowIndex,
+							rowArray,
+							rowText,
+							options,
+							csvProcessor
+						});
+						if (typeof tmp === 'string') {
+							outputFileNames = [tmp];
+						} else if (Array.isArray(tmp)) {
+							outputFileNames = tmp;
+						}
+					}
+					catch(e){
+						console.error(`出力ファイル名を設定する処理の実行に失敗しました。`,e);
+					}
+				}
+				for(const outputFileName of outputFileNames){
+					const outputFileFullName = `${outputFileName}`;
+					// 出力ファイルに書き込み
+					await csvProcessor.outputToFile(outputFileFullName,outputText);
+				}
+			}
+
+
+
 		} // 行ごと
-		console.log(csvArray);
+		console.log(`processCsv Finished: ${csvIndex}`,csvFile);
+		return csvArray;
 	},
 
+	outputToFile: async (outputFileFullName,text)=>{
+		// 出力ファイルのwriteableStreamが存在するかチェック
+		if(!csvProcessor.outputFilesWriteableStream){
+			csvProcessor.outputFilesWriteableStream = [];
+		}
+		let writeableStream;
+		if(!csvProcessor.outputFilesWriteableStream[outputFileFullName]){
+			// なければ作成
+			console.log("File creating",outputFileFullName);
+			csvProcessor.changeStatusText("output",`ファイル作成中: ${outputFileFullName}`);
+			const fileHandle = await csvProcessor.outputDirectoryHandle.getFileHandle(outputFileFullName, {create: true});
+			writeableStream = await fileHandle.createWritable();
+			console.log("File created",outputFileFullName);
+			csvProcessor.changeStatusText("output",`ファイル作成完了: ${outputFileFullName}`);
+			csvProcessor.outputFilesWriteableStream[outputFileFullName] = writeableStream;
+			if(!csvProcessor.outputFilesBuffer){csvProcessor.outputFilesBuffer = [];}
+			csvProcessor.outputFilesBuffer[outputFileFullName] = "";
+
+			// prefixを書き込み
+			if(csvProcessor.options.outputPrefixText!=""){
+				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputPrefixText
+			}
+			// ヘッダーを書き込み
+			if(csvProcessor.headerText){
+				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.headerText + csvProcessor.options.outputLineBreak;
+			}
+			// 1行目を書き込み
+			csvProcessor.outputFilesBuffer[outputFileFullName] += text;
+
+		}else{
+			// あれば追記
+			writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
+			csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputLineBreak + text;
+		}
+
+		if(csvProcessor.outputFilesBuffer[outputFileFullName].length > csvProcessor.settings.outputBufferSize){
+			const arraybuffer = csvProcessor.encodeText(csvProcessor.outputFilesBuffer[outputFileFullName],csvProcessor.options.outputEncoding);
+			await writeableStream.write(arraybuffer);
+			csvProcessor.outputFilesBuffer[outputFileFullName] = "";
+			console.log("File wrote",outputFileFullName);
+			csvProcessor.changeStatusText("output",`ファイル書き込みを実施: ${outputFileFullName}`);
+		}
+
+	},
+
+	closeAllOutputStream: async()=>{
+		if(!csvProcessor.outputFilesWriteableStream || Object.keys(csvProcessor.outputFilesWriteableStream).length == 0){
+			csvProcessor.dialog("出力ファイルが作成されませんでした。");
+			return;
+		}
+		for(const [outputFileFullName,writeableStream] of Object.entries(csvProcessor.outputFilesWriteableStream)){
+			// 改行を追加
+			if(csvProcessor.options.outputAddLastLineBreak){
+				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputLineBreak;
+			}
+
+			// suffixTextを書き込み
+			if(csvProcessor.options.outputSuffixText!=""){
+				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputSuffixText
+			}
+
+			// ストリーム書き込み
+			const arraybuffer = csvProcessor.encodeText(csvProcessor.outputFilesBuffer[outputFileFullName],csvProcessor.options.outputEncoding);
+			// writeableStream.write(arraybuffer); 
+			// writeableStream.close(); 
+			writeableStream.write(arraybuffer).then(()=>{
+				writeableStream.close();
+				console.log("File closed",outputFileFullName);
+				csvProcessor.changeStatusText("output",`ファイルを閉じました: ${outputFileFullName}`);
+			});
+
+			// バッファを削除
+			delete csvProcessor.outputFilesBuffer[outputFileFullName]
+			delete csvProcessor.outputFilesWriteableStream[outputFileFullName];
+		}
+	},
+
+	encodeText: (text,encode)=>{
+		if(encode == 'UTF-8'){
+			// UTF-8の場合はencoding.jsを使わない(たぶん遅いので)
+			return new TextEncoder().encode(text);
+		}else{
+			const array = Encoding.convert(text, {to: encode, from: 'UNICODE', type: 'array'});
+			const uint8Array = new Uint8Array(array);
+			return uint8Array ;
+		}
+	},
+	
 	makeUserFunc: (userCode,args)=>{
+		if(!userCode || userCode == ""){
+			return "userFunc is empty";
+		}
 		let code= `try{\n${userCode}\n}catch(e){console.log("userFunc failed:",e.message);console.error(e);}`;
 		let func;
 		try{
@@ -526,7 +889,7 @@ const csvProcessor = {
 				}
 				break;
 		}//switch
-		console.log(arrayObj);
+		// console.log(arrayObj);
 		return {arrayObj,rowTextObj};
 	},
 
@@ -575,4 +938,77 @@ const csvProcessor = {
 	return result;
 	},
 
+	rowArrayToCsvText: (rowArray,options={
+		delimiter:',',
+		lineBreak:'\n',
+		isUsingHeader:false,
+		wrapper:'"',
+		isUsingWrapper:false,
+		isUsingWrapperAll:false,
+		isUsingSpecialCharacterInWrapper:false,
+		addLastLineBreak:false})=>{
+
+		// 先に、すべてのセルの特殊文字をチェック・置換
+		if(options.isUsingWrapper && (options.isUsingSpecialCharacterInWrapper||options.isUsingWrapperAll) ){
+			for(const [cellIndex,cell] of row.entries()){
+				if(options.isUsingWrapperAll || (cell.includes(options.wrapper)||cell.includes(options.delimiter)||cell.includes("\n")||cell.includes("\r"))){ // 安全のため、CR・LFのいずれかがある場合はエスケープ
+					array[rowIndex][cellIndex] = `${options.wrapper}${cell.replace(new RegExp(options.wrapper, 'g'), options.wrapper + options.wrapper)}${options.wrapper}`;
+				}
+			}
+		}
+
+		return rowArray.join(options.delimiter);
+	},
+
+	dialog: (message)=>{
+		alert(message);
+	},
+
+	changeStatusText: (type,message)=>{
+		document.getElementById(`${type}StatusText`).textContent = message;
+	},
+
+	// encodeToSjis: (content)=>{
+	// 	// from:https://qiita.com/dopperi46/items/49441391fa0e3beae3da
+	// 	let buffer = [];
+	// 	for (let i = 0; i < content.length; i++) {
+	// 		const c = content.codePointAt(i);
+	// 		if (c > 0xffff) {
+	// 				i++;
+	// 		}
+	// 		if (c < 0x80) {
+	// 				buffer.push(c);
+	// 		}
+	// 		else if (c >= 0xff61 && c <= 0xff9f) {
+	// 				buffer.push(c - 0xfec0);
+	// 		}
+	// 		else {
+	// 			const d = this.sjisEncodeTable[String.fromCodePoint(c)] || 0x3f;
+	// 			if (d > 0xff) {
+	// 					buffer.push(d >> 8 & 0xff, d & 0xff);
+	// 			}
+	// 			else {
+	// 					buffer.push(d);
+	// 			}
+	// 		}
+	// 	}
+	// 	return Uint8Array.from(buffer);
+	// },
+
 }
+
+// エンコード用テーブル生成
+// {
+// 	csvProcessor.sjisEncodeTable = { '\u00a5': 0x5c, '\u203e': 0x7e, '\u301c': 0x8160 };
+// 	const decoder = new TextDecoder('shift-jis');
+// 	for (let i = 0x81; i <= 0xfc; i++) {
+// 			if (i <= 0x84 || i >= 0x87 && i <= 0x9f || i >= 0xe0 && i <= 0xea || i >= 0xed && i <= 0xee || i >= 0xfa) {
+// 					for (let j = 0x40; j <= 0xfc; j++) {
+// 							const c = decoder.decode(new Uint8Array([i, j]));
+// 							if (c.length === 1 && c !== '\ufffd' && !csvProcessor.sjisEncodeTable[c]) {
+// 									csvProcessor.sjisEncodeTable[c] = i << 8 | j;
+// 							}
+// 					}
+// 			}
+// 	}
+// }
