@@ -1,7 +1,7 @@
 'use strict';
 
 // todo
-// 進捗状況表示
+// FileSystemSyncAccessHandleに変更
 // 列数が合わない行
 // UI調整 折りたたみ
 // ディレクトリの書き出し
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	// 出力ディレクトリ選択ボタンが押されたら、ディレクトリ選択ダイアログを開く
 	const outputDirectorySelectButton = document.getElementById('outputDirectorySelectButton');
 	outputDirectorySelectButton.addEventListener('click', async function(){
-		csvProcessor.outputDirectoryHandle = await window.showDirectoryPicker();
+		csvProcessor.outputDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
 		csvProcessor.changeStatusText("outputDirectory",`出力ディレクトリが設定されました:${csvProcessor.outputDirectoryHandle.name}`);
 	});
 
@@ -296,9 +296,9 @@ const csvProcessor = {
 
 
 		// 入力ファイルの読み込み
-		csvProcessor.inputFilesText = [];
-		csvProcessor.inputFilesArray = [];
-		csvProcessor.inputFilesRowTextArray = [];
+		csvProcessor.inputFileText = "";
+		// csvProcessor.inputFileArray = [];
+		// csvProcessor.inputFileRowTextArray = [];
 		
 		if(!csvProcessor.inputFiles || csvProcessor.inputFiles.length == 0){
 			csvProcessor.dialog("入力ファイルが選択されていません。");
@@ -332,7 +332,7 @@ const csvProcessor = {
 			csvProcessor.changeStatusText("output",`ファイル読み込み完了 加工処理開始: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
 
 			// 処理パート
-			csvProcessor.inputFilesText.push(csvText);
+			csvProcessor.inputFileText = csvText;
 			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvText,{
 				delimiter: options.inputDelimiter || ',',
 				lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
@@ -352,8 +352,8 @@ const csvProcessor = {
 
 			const csvArray = csvTextToArrayResult.arrayObj;
 			const rowTextArray = csvTextToArrayResult.rowTextObj;
-			csvProcessor.inputFilesArray.push(csvArray);
-			csvProcessor.inputFilesRowTextArray.push(rowTextArray);
+			// csvProcessor.inputFileArray = csvArray;
+			// csvProcessor.inputFileRowTextArray = rowTextArray;
 			// 処理と書き込み
 			const csvArrayAfterProcess = await csvProcessor.processCsv(csvIndex,csvTextToArrayResult);
 			// console.log(csvArrayAfterProcess);
@@ -370,7 +370,7 @@ const csvProcessor = {
 		const csvArray = csvTextToArrayResult.arrayObj;
 		const rowTextArray = csvTextToArrayResult.rowTextObj;
 		const options = csvProcessor.options;
-		const csvText = csvProcessor.inputFilesText[csvIndex];
+		const csvText = csvProcessor.inputFileText;
 		// csvごとに行う処理
 		// ユーザー処理
 		if(csvProcessor.perInputFuncFlag){
@@ -382,7 +382,7 @@ const csvProcessor = {
 					csvText,
 					csvArray,
 					options,
-					csvProcessor
+					// csvProcessor
 				});
 			}
 			catch(e){
@@ -406,7 +406,7 @@ const csvProcessor = {
 						rowArray,
 						rowText,
 						options,
-						csvProcessor
+						// csvProcessor
 					});
 					if (Array.isArray(tmp)) {
 						// csvArray[rowIndex] = tmp;
@@ -434,7 +434,7 @@ const csvProcessor = {
 							cellIndex,
 							cellText,
 							options,
-							csvProcessor
+							// csvProcessor
 						});
 						// 戻り値が文字列であれば、cellDataを上書き
 						switch(typeof tmp){
@@ -485,7 +485,7 @@ const csvProcessor = {
 							rowArray,
 							rowText,
 							options,
-							csvProcessor
+							// csvProcessor
 						});
 						if (typeof tmp === 'string') {
 							outputFileNames = [tmp];
