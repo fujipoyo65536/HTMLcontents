@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
 const csvProcessor = {
 
 	settings:{
-		outputBufferSize : 100_000_000, // 100M
+		outputBufferSize : 20_000_000, // 20M
 	},
 
 	loadAndUpdatePreview: async()=>{
