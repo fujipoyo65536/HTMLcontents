@@ -128,25 +128,23 @@ const csvProcessor = {
 		const options = csvProcessor.getOptionsFromHtml();
 		const file = csvProcessor.inputFiles[0].fileObj;
 		const reader = new FileReader();
-		if(options.inputEncoding == 'AUTO'){
-			reader.onload = function(){
-				const uint8Array = new Uint8Array(reader.result);
+		
+		reader.onload = function(){
+			const uint8Array = new Uint8Array(reader.result);
+			const inputEncoding = options.inputEncoding;
+			let text;
+			if(inputEncoding == 'AUTO'){
 				const unicodeArray = Encoding.convert(uint8Array, {to: 'UNICODE',from: 'AUTO'});
-				const text = Encoding.codeToString(unicodeArray);
-				document.getElementById('inputCsvTextInput').value = text.slice(0, 100000);
-				csvProcessor.temporaryInputText = text;
-			};
-			reader.readAsArrayBuffer(file);
-		}else{
-			reader.onload = function(){
-				document.getElementById('inputCsvTextInput').value = reader.result.slice(0, 100000);
-				csvProcessor.temporaryInputText = reader.result;
-			};
-			reader.readAsText(file);
-		}
-		csvProcessor.updatePreview();
-
-
+				text = Encoding.codeToString(unicodeArray);
+			}else{
+				const decoder = new TextDecoder(inputEncoding);
+				text = decoder.decode(uint8Array);
+			}
+			document.getElementById('inputCsvTextInput').value = text.slice(0, 100000);
+			csvProcessor.temporaryInputText = text;
+			csvProcessor.updatePreview();
+		};
+		reader.readAsArrayBuffer(file);
 	},
 
 	updatePreview: ()=>{
