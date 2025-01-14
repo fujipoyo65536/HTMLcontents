@@ -1,7 +1,8 @@
 'use strict';
 
 // todo
-// FileSystemSyncAccessHandleに変更
+// 出力の大きさが大きい場合にOut Of Memoryになる問題の修正
+// 入力が1ファイル500MBを超えるとOut Of Memoryになる問題の修正
 // 列数が合わない行
 // UI調整 折りたたみ
 // ディレクトリの書き出し
