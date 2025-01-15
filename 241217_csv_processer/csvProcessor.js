@@ -1,11 +1,18 @@
 'use strict';
 
+// Encoding.jsでの入力はUInt8Arrayにした時点で壊れている
+// 
+
+
 // todo
 // 出力の大きさが大きい場合にOut Of Memoryになる問題の修正
 // 入力が1ファイル500MBを超えるとOut Of Memoryになる問題の修正
 // 列数が合わない行
 // UI調整 折りたたみ
 // ディレクトリの書き出し
+// userFuncから触れる永続的な変数を準備
+// 累積出力行数変数を追加
+// perProcessFuncを追加
 
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
@@ -131,7 +138,7 @@ const csvProcessor = {
 		const reader = new FileReader();
 		
 		reader.onload = function(){
-			const uint8Array = new Uint8Array(reader.result);
+			const uint8Array = new Uint8Array(reader.result).slice(0, 100000);
 			const inputEncoding = options.inputEncoding;
 			let text;
 			if(inputEncoding == 'AUTO'){
@@ -141,7 +148,7 @@ const csvProcessor = {
 				const decoder = new TextDecoder(inputEncoding);
 				text = decoder.decode(uint8Array);
 			}
-			document.getElementById('inputCsvTextInput').value = text.slice(0, 100000);
+			document.getElementById('inputCsvTextInput').value = text;
 			csvProcessor.temporaryInputText = text;
 			csvProcessor.updatePreview();
 		};
@@ -252,48 +259,51 @@ const csvProcessor = {
 		
 		// ユーザー関数の準備
 		// 入力ファイルごとに実行する処理
-		let perInputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perInputCode']").value);
-		if(typeof perInputFunc === 'function'){
-			csvProcessor.perInputFunc = perInputFunc;
-			csvProcessor.perInputFuncFlag = true;
-		}else if(typeof perInputFunc === 'string'){
-			csvProcessor.perInputFunc = undefined;
-			console.log("入力ファイルごとに実行する処理は定義されませんでした",perInputFunc);
-			csvProcessor.perInputFuncFlag = false;
+		{
+			let perInputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perInputCode']").value);
+			if(typeof perInputFunc === 'function'){
+				csvProcessor.perInputFunc = perInputFunc;
+				csvProcessor.perInputFuncFlag = true;
+			}else if(typeof perInputFunc === 'string'){
+				csvProcessor.perInputFunc = undefined;
+				console.log("入力ファイルごとに実行する処理は定義されませんでした",perInputFunc);
+				csvProcessor.perInputFuncFlag = false;
+			}
+	
+			// 行ごとに実行する処理
+			let perRowFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perRowCode']").value);
+			if(typeof perRowFunc === 'function'){
+				csvProcessor.perRowFunc = perRowFunc;
+				csvProcessor.perRowFuncFlag = true;
+			}else if(typeof perRowFunc === 'string'){
+				csvProcessor.perRowFunc = undefined;
+				console.log("行ごとに実行する処理は定義されませんでした",perRowFunc);
+				csvProcessor.perRowFuncFlag = false;
+			}
+			
+			// セルごとに実行する処理
+			let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perCellCode']").value);
+			if(typeof perCellFunc === 'function'){
+				csvProcessor.perCellFunc = perCellFunc;
+				csvProcessor.perCellFuncFlag = true;
+			}else if(typeof perCellFunc === 'string'){
+				csvProcessor.perCellFunc = undefined;
+				console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
+				csvProcessor.perCellFuncFlag = false;
+			}
+	
+			// 出力ファイル名を設定する処理
+			let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode);
+			if(typeof outputFileNameFunc === 'function'){
+				csvProcessor.outputFileNameFunc = outputFileNameFunc;
+				csvProcessor.outputFileNameFuncFlag = true;
+			}else if(typeof outputFileNameFunc === 'string'){
+				csvProcessor.outputFileNameFunc = undefined;
+				console.log("出力ファイル名を設定する処理は定義されませんでした",outputFileNameFunc);
+				csvProcessor.outputFileNameFuncFlag = false;
+			}
 		}
 
-		// 行ごとに実行する処理
-		let perRowFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perRowCode']").value);
-		if(typeof perRowFunc === 'function'){
-			csvProcessor.perRowFunc = perRowFunc;
-			csvProcessor.perRowFuncFlag = true;
-		}else if(typeof perRowFunc === 'string'){
-			csvProcessor.perRowFunc = undefined;
-			console.log("行ごとに実行する処理は定義されませんでした",perRowFunc);
-			csvProcessor.perRowFuncFlag = false;
-		}
-		
-		// セルごとに実行する処理
-		let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perCellCode']").value);
-		if(typeof perCellFunc === 'function'){
-			csvProcessor.perCellFunc = perCellFunc;
-			csvProcessor.perCellFuncFlag = true;
-		}else if(typeof perCellFunc === 'string'){
-			csvProcessor.perCellFunc = undefined;
-			console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
-			csvProcessor.perCellFuncFlag = false;
-		}
-
-		// 出力ファイル名を設定する処理
-		let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode);
-		if(typeof outputFileNameFunc === 'function'){
-			csvProcessor.outputFileNameFunc = outputFileNameFunc;
-			csvProcessor.outputFileNameFuncFlag = true;
-		}else if(typeof outputFileNameFunc === 'string'){
-			csvProcessor.outputFileNameFunc = undefined;
-			console.log("出力ファイル名を設定する処理は定義されませんでした",outputFileNameFunc);
-			csvProcessor.outputFileNameFuncFlag = false;
-		}
 
 
 
@@ -315,17 +325,22 @@ const csvProcessor = {
 			const reader = new FileReader();
 
 			// 同期で読み込み
-			let csvText;
+			let csvTextArray; // 1文字ずつの配列
 			if(options.inputEncoding == 'AUTO'){ // Encoding.jsを使って自動判定
+				// 重いデータには対応しない
 				reader.readAsArrayBuffer(fileObj);
-				csvText = await new Promise((resolve)=>{reader.onload = ()=>{
+				csvTextArray = await new Promise((resolve)=>{reader.onload = ()=>{
 					const uint8Array = new Uint8Array(reader.result);
-					const unicodeText = Encoding.convert(uint8Array, {to: 'UNICODE',from: 'AUTO',type: 'string'});
-					resolve(unicodeText);
+					const csvTextArray = Encoding.convert(uint8Array, {to: 'UNICODE',from: 'AUTO',type: 'array'}).map((code)=>String.fromCharCode(code));
+					resolve(csvTextArray);
 				}});
 			}else{
-				reader.readAsText(fileObj);
-				csvText = await new Promise((resolve)=>{reader.onload = ()=>{resolve(reader.result)}});
+				reader.readAsArrayBuffer(fileObj);
+				csvTextArray = await new Promise((resolve)=>{reader.onload = ()=>{
+					const uint8Array = new Uint8Array(reader.result);
+					const csvTextArray = csvProcessor.uInt8ArrayToTextArray(uint8Array,options.inputEncoding);
+					resolve(csvTextArray);
+				}});
 			}
 			// 閉じる
 			reader.abort();
@@ -334,8 +349,8 @@ const csvProcessor = {
 			csvProcessor.changeStatusText("output",`ファイル読み込み完了 加工処理開始: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
 
 			// 処理パート
-			csvProcessor.inputFileText = csvText;
-			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvText,{
+			csvProcessor.inputFileTextObj = csvTextArray;
+			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvTextArray,{
 				delimiter: options.inputDelimiter || ',',
 				lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
 				skipRowNumber: options.inputSkipRowNumber || 0,
@@ -360,6 +375,10 @@ const csvProcessor = {
 			const csvArrayAfterProcess = await csvProcessor.processCsv(csvIndex,csvTextToArrayResult);
 			// console.log(csvArrayAfterProcess);
 			csvProcessor.changeStatusText("output",`ファイルのすべての処理が完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
+
+			//csvProcessorをクリーンにする
+			csvProcessor.inputFileTextObj = null;
+			csvProcessor.inputFileText = "";
 		}// inputFileごと
 		await csvProcessor.closeAllOutputStream();
 		console.log("processAll Finished");
@@ -674,7 +693,7 @@ const csvProcessor = {
 		return options;
 	},
 
-	csvTextToArray: (csvText,options={
+	csvTextToArray: (csvTextInput,options={
 			delimiter:',',
 			lineBreakSelect:'ALL', // ALL,LF,CR,CRLF
 			skipRowNumber:0,
@@ -687,40 +706,80 @@ const csvProcessor = {
 			isUsingWrapperInWrapper:false,
 			isUsingLineBreakInWrapper:false})=>{
 
+		// csvTextInputは文字列か、1文字ずつの配列(中身は文字)
 
-		let lineBreak
+		// ここからしばらく、入力は配列として扱う ★ダメ文字とかの面で問題のあるコード
+		let csvTextArray = [];
+		if (typeof csvTextInput === 'string') {
+			csvTextArray = csvTextInput.split('')
+		} else if (Array.isArray(csvTextInput)) {
+			csvTextArray = csvTextInput;
+		}
+
+		let lineBreakRegExp;
+		let lineBreak;
 		switch(options.lineBreakSelect){
 			case 'ALL':
-				lineBreak = /[\r\n|\r|\n]/;
+				lineBreakRegExp = /[\r\n|\r|\n]/;
+				lineBreak = '\r\n';
 				break;
 			case 'LF':
-				lineBreak = /\n/;
+				lineBreakRegExp = /\n/;
+				lineBreak = '\n';
 				break;
 			case 'CR':
-				lineBreak = /\r/;
+				lineBreakRegExp = /\r/;
+				lineBreak = '\r';
 				break;
 			case 'CRLF':
-				lineBreak = /\r\n/;
+				lineBreakRegExp = /\r\n/;
+				lineBreak = '\r\n';
 				break;
 			default:
-				lineBreak = /\n/;
+				lineBreakRegExp = /\n/;
+				lineBreak = '\n';
 				break;
 		}
+
+		// 改行をLFに統一
+		let tmpArray = [];
+		for( let i = 0; i < csvTextArray.length; i++){
+			if(csvTextArray[i] == '\r' && csvTextArray[i+1] == '\n'){
+				// CRLFはLFに変換
+				tmpArray.push('\n');
+				i++;
+			}else if(csvTextArray[i] == '\r'){
+				// CRはLFに変換
+				tmpArray.push('\n');
+			}else{
+				tmpArray.push(csvTextArray[i]);
+			}
+		}
+		csvTextArray = tmpArray;
 
 
 		//入力末尾の改行を消す
 		if(options.ignoreLastLineBreak){
-			csvText = csvText.replace(/[\r\n|\r|\n]$/, '');
+			if(csvTextArray[csvTextArray.length-1] == '\n'){
+				csvTextArray.pop();
+			}
 		}
-
-		const rows = csvText.split(lineBreak);
 
 		// 先頭行を読み飛ばして捨てる
-		for(let i = 0; i < options.skipRowNumber; i++){
-			rows.shift();
+		if(options.skipRowNumber > 0){
+			let tmpArray = [];
+			let rowCount = 0;
+			for( let i = 0; i < csvTextArray.length; i++){
+				if(csvTextArray[i] == '\n'){
+					rowCount++;
+					if(rowCount >= options.skipRowNumber){
+						tmpArray.push(csvTextArray[i]);
+					}
+				}
+			}
+			csvTextArray = tmpArray;
 		}
-
-
+		
 		// 処理モードの決定(データの複雑さによる)
 		// 1:最初に改行で分割し、その後デリミタで分割していいもの
 		// 2:最初に改行で分割するが、先頭から各セルを判断する必要があるもの
@@ -744,10 +803,15 @@ const csvProcessor = {
 		switch(readingMode){
 			case 1:
 				{
+					// 行に分割
+					let rows = csvProcessor.splitTextArray(csvTextArray, "\n", "String");
+
+					// ヘッダー行が無い場合はnullを格納
 					if(!options.isUsingHeader){
 						arrayObj[0] = null;
 						rowTextObj[0] = null;
 					}
+					
 					// それ以外の行を格納
 					for(let i = 0; i < rows.length; i++){
 						rowTextObj.push(rows[i]);
@@ -786,12 +850,10 @@ const csvProcessor = {
 				// 今作っていないのでレベル3で処理
 			case 3:
 				{
-					let splitText;
-					if(options.skipRowNumber > 0){
-						splitText = rows.join("\n")
-					}else{
-						splitText = csvText.split("");
-					}
+					//1文字ずつ細切れのArrayを生成
+					let splitTextArray = csvTextArray;
+
+					// ヘッダー行が無い場合はnullを格納
 					if(!options.isUsingHeader){
 						arrayObj[0] = null;
 						rowTextObj[0] = null;
@@ -805,10 +867,10 @@ const csvProcessor = {
 					let inWrapper = false;
 					let afterWrapperCharacter = false; //ラッパー内でラッパーが1つ出てきたとき
 					
-					for(let i = 0; i < splitText.length; i++){
-						rowText += splitText[i];
-						const char = splitText[i];
-						const lineBreakMatch = (char.match(lineBreak)||[null])[0];
+					for(let i = 0; i < splitTextArray.length; i++){
+						rowText += splitTextArray[i];
+						const char = splitTextArray[i];
+						const lineBreakMatch = (char.match(lineBreakRegExp)||[null])[0];
 						// ここから1文字ずつ処理していく
 						if(inWrapper){
 							switch(char){
@@ -969,6 +1031,129 @@ const csvProcessor = {
 	changeStatusText: (type,message)=>{
 		document.getElementById(`${type}StatusText`).textContent = message;
 	},
+
+	splitTextArray: (inputTextData,delimiter,returnType)=>{
+		// delimiterは2文字までに対応
+	
+		// まずは1文字ずつの配列に変える
+		// 文字列だったら、1文字ずつの配列に変える
+		let textArray = [];
+		if (typeof inputTextData === 'string') {
+			textArray = inputTextData.split('');
+		} else if (Array.isArray(inputTextData)) {
+			textArray = inputTextData; // 配列だったらそのまま
+		}
+
+		let resultArray = [];
+		let cellArray	= [];
+		if(delimiter.length == 1){
+			for(let i = 0; i < textArray.length; i++){
+				if(textArray[i] == delimiter){
+					resultArray.push(cellArray);
+					cellArray = [];
+				}else{
+					cellArray.push(textArray[i]);
+				}
+			}
+		}else if(delimiter.length == 2){
+			for(let i = 0; i < textArray.length; i++){
+				if(textArray[i] == delimiter[0] && textArray[i+1] == delimiter[1]){
+					resultArray.push(cellArray);
+					cellArray = [];
+					i++;
+				}else{
+					cellArray = textArray[i];
+				}
+			}
+		}
+		// 最後のセルを追加
+		resultArray.push(cellArray);
+
+		switch(returnType){
+			case 'String':
+				return resultArray.map(cellArray => cellArray.join(''));
+			case 'Array':
+				return resultArray;
+
+		}
+
+	},
+
+	uInt8ArrayToTextArray: (uInt8Array,encode)=>{
+		// マルチバイト文字に対応しつつ、1文字ずつの配列に変換
+		// 文字コードのデコードもする
+
+		// まず、配列をある程度の流さに分割する。
+		// ただし文字コードごとに、マルチバイト文字の途中では分割しないようにする。
+		let textArrays = []; // 分割後テキスト
+		const limit = 1_000_000;
+		let textArray = []; // 分割前テキスト配列(中身はテキスト)
+		for(let i = 0; i < uInt8Array.length; i++){
+			textArray.push(uInt8Array[i]);
+			if(textArray.length >= limit){
+				// encodeごとに、区切って良い位置かを判定
+				let breakSafeFlag
+				switch(encode){
+					case 'utf-8':
+					case 'euc-jp':
+						//1バイト文字(の直後)なら区切ってOK
+						if(uInt8Array[i] < 0x80){
+							breakSafeFlag = true;
+						}else{
+							breakSafeFlag = false;
+						}
+						break;
+
+					case 'shift-jis':
+						//2バイト文字の1バイト目は区切ってはダメ
+						if(uInt8Array[i] >= 0x81 && uInt8Array[i] <= 0x9f || uInt8Array[i] >= 0xe0 && uInt8Array[i] <= 0xfc){
+							breakSafeFlag = false;
+						}else{
+							breakSafeFlag = true;
+						}
+						break;
+
+					case 'iso-2022-jp':
+						//マルチバイト文字の場合は(1文字目でも2文字目でも)区切ってはいけない
+						if(uInt8Array[i] >= 0x21 && uInt8Array[i] <= 0x7e){
+							breakSafeFlag = false;
+						}else{
+							breakSafeFlag = true;
+						}
+						break;
+
+					case 'utf-16':
+					case 'utf-16be':
+					case 'utf-16le':
+						//奇数文字目の文字は区切ってはいけない
+						//例:i=0はダメ i=1はOK
+						if(i % 2 == 1){
+							breakSafeFlag = true;
+						}
+						break;
+				}
+				if(breakSafeFlag){
+					textArrays.push(textArray);
+					textArray = [];
+				}
+			}
+		}
+		textArrays.push(textArray);
+
+		// それぞれのtextArrayをデコードして文字列にする配列にして結合する
+		let resultArray = [];
+		for(let textArray of textArrays){
+			let uInt8Array = new Uint8Array(textArray);
+			let text = new TextDecoder(encode).decode(uInt8Array);
+			// 1文字ずつの配列に変換
+			let textArrayEncoded = text.split('');
+			resultArray = resultArray.concat(textArrayEncoded);
+		}
+
+		return resultArray;
+	},
+
+	
 
 	// encodeToSjis: (content)=>{
 	// 	// from:https://qiita.com/dopperi46/items/49441391fa0e3beae3da
