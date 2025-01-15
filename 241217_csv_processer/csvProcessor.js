@@ -1,18 +1,19 @@
 'use strict';
 
-// Encoding.jsでの入力はUInt8Arrayにした時点で壊れている
-// 
+// 現状の問題
+// 500MB程度のファイルでメモリオーバーで落ちる。uInt8ArrayToTextArrayが重い。というか出力される配列が相当に重い。そもそも配列の長さがオーバーしている気がする。
+// 先頭スキップがうまく働いていない気がする
 
 
 // todo
 // 出力の大きさが大きい場合にOut Of Memoryになる問題の修正
 // 入力が1ファイル500MBを超えるとOut Of Memoryになる問題の修正
+// userFuncから触れる永続的な変数を準備
+// 累積出力行数変数を追加
+// perProcessFuncを追加→何につかうの?
 // 列数が合わない行
 // UI調整 折りたたみ
 // ディレクトリの書き出し
-// userFuncから触れる永続的な変数を準備
-// 累積出力行数変数を追加
-// perProcessFuncを追加
 
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
@@ -1086,7 +1087,7 @@ const csvProcessor = {
 		// まず、配列をある程度の流さに分割する。
 		// ただし文字コードごとに、マルチバイト文字の途中では分割しないようにする。
 		let textArrays = []; // 分割後テキスト
-		const limit = 1_000_000;
+		const limit = 100_000;
 		let textArray = []; // 分割前テキスト配列(中身はテキスト)
 		for(let i = 0; i < uInt8Array.length; i++){
 			textArray.push(uInt8Array[i]);
@@ -1124,11 +1125,31 @@ const csvProcessor = {
 
 					case 'utf-16':
 					case 'utf-16be':
+						//奇数文字目の文字は区切ってはいけない
+						//例:i=0はダメ i=1はOK
+						if(i % 2 == 1){
+							//サロゲートペアは区切ったらダメ
+							if(uInt8Array[i-1] >= 0xd8 && uInt8Array[i-1] <= 0xdf){
+								breakSafeFlag = false;
+							}else{
+								breakSafeFlag = true;
+							}
+						}else{
+							breakSafeFlag = false;
+						}
+						break;
 					case 'utf-16le':
 						//奇数文字目の文字は区切ってはいけない
 						//例:i=0はダメ i=1はOK
 						if(i % 2 == 1){
-							breakSafeFlag = true;
+							//サロゲートペアは区切ったらダメ
+							if(uInt8Array[i] >= 0xd8 && uInt8Array[i] <= 0xdf){
+								breakSafeFlag = false;
+							}else{
+								breakSafeFlag = true;
+							}
+						}else{
+							breakSafeFlag = false;
 						}
 						break;
 				}
