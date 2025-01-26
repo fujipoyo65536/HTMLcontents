@@ -10,6 +10,8 @@ body{
     margin: 0;
     padding: 0;
     font-size: 12px;
+    /* font-family: "Cascadia Code",sans-serif; */
+    font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace;
 }
 
 textarea{
@@ -54,31 +56,112 @@ label:hover{
   background-color: #EEE;
 }
 
-/* stepBox */
+/* Header */
+#header{
+  height: 40px;
+  background-color: #333;
+  color: #FFF;
+  line-height: 36px;
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+}
+#headerTitle{
+  padding: 2px 10px;
+  font-size: 32px;
+}
 
-.stepBox{
+#profileMenu{
+  display: flex;
+  padding: 5px;
+}
+
+#profileMenuTitle{
+  line-height: 30px;
+  height: 100%;
+  font-weight: bold;
+}
+
+.profileMenuComment{
+  border-left: 1px solid #FFF;
+  margin-left: 5px;
+  padding: 0 5px;
+  line-height: 30px;
+  height: 100%;
+}
+
+/* Content */
+#contentTitleBox{
+  margin: 20px;
+  text-align: center;
+  font-size: 60px;
+  font-weight: bold;
+}
+#contentTitle{
+  margin: 0;
+}
+#contentDescription{
+  font-size: 0.3em;
+  margin: 0;
+}
+
+
+/* step */
+
+#stepBox{
+  display:flex;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@media screen and (max-width: 1800px){
+  #stepBox{
+    flex-direction: column;
+  }
+}
+
+.step{
   margin: 10px;
   background-color: #DDF;
   padding: 10px;
   border-radius: 10px;
+  flex-basis: 32%;
+  flex-shrink: 2;
+  max-width: 32%;
 }
-.stepBox>h2{
+
+@media screen and (max-width: 1800px){
+  .step{
+    max-width: 100%;
+  }
+}
+
+.step>h2{
+  text-align: center;
+  height: 54px;
+  line-height: 54px;
+  font-size: 32px;
   margin: 0;
-  padding-bottom: 5px;
   border-bottom: 1px solid #000;
 }
-.stepBox>div{
+
+.step>h2>.stepSubTitle{
+  font-size: 0.5em;
+}
+
+.step>div{
   margin-left: 10px;
   /* padding: 10px; */
 }
 
-.stepBox#step1{
+.step#step1{
   background-color: #DDF;
 }
-.stepBox#step2{
+.step#step2{
   background-color: #DFD;
 }
-.stepBox#step3{
+.step#step3{
   background-color: #FDD;
 }
 
@@ -142,8 +225,16 @@ label:hover{
   padding: 2px 5px;
 }
 
+
+
+#outputButtonBox{
+  text-align: center;
+  width: 100%;
+  max-width: 800px;
+}
+
 #outputButton{
-  margin: 10px 5px;
+  margin: 10px 0;
   padding: 5px;
   text-align: center;
   font-size: 2em;
@@ -158,11 +249,12 @@ label:hover{
 }
 
 #outputStatusTextBox{
-  margin: 10px;
+  margin: 10px 0;
   padding: 5px;
   border: 1px solid #555;
   border-radius: 5px;
   background-color: #FFF;
+  text-align: left;
 }
 #outputStatusText>p{
   line-height: 1em;

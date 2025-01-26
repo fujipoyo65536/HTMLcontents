@@ -9,28 +9,59 @@
 	<script src="csvProcessor.js"></script>
 </head>
 <body>
+	<div id="header">
+		<div id="headerTitle">CSV Processor</div>
+		<div id="profileMenu">
+			<div id="profileMenuTitle">プロファイル操作：</div>
+			<div class="profileMenuComment">
+				ブラウザ内から選ぶ
+			</div>
+			<select id="profileSelect">
+				<option value="default">デフォルト</option>
+			</select>
+			<button id="profileOpenButton">開く</button>
+			<div class="profileMenuComment">
+				今の設定を保存
+			</div>
+			<button id="profileSaveButton">保存</button>
+			<div class="profileMenuComment">
+				ファイル
+			</div>
+			<button id="profileInportButton">インポート</button>
+			<button id="profileExportButton">エクスポート</button>
+		</div>
+	</div>
 	<div id="content">
-		<div id="step1" class="stepBox">
-			<h2>Step 1: 入力</h2>
-			<h3>読み込み方法の設定</h3>
-			<div>
-				<div class="optionSet">
-					<label class="optionBox"><input type="radio" name="inputMethod" value="file" checked data-option="inputMethod"> ファイルを読み込む</label>
-					<label class="optionBox">
-						ファイルを選択：<input type="file" id="selectFileButton" accept=".csv" multiple>
-					</label>
-				</div>
-				<div class="optionSet">
-					<label class="optionBox"><input type="radio" name="inputMethod" value="directory" data-option="inputMethod"> フォルダを読み込む</label>
-					<label class="optionBox">
-						フォルダを選択：
-						<button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
-					</label>
-					<label class="optionBox">
-						読み込みフィルタ(RegExp):<input type="text" id="inputFileRegExpInput" value=".csv$" style="width: 5em;" disabled data-option="inputFileRegExp">
-					</label>
-					<button id="directoryReloadButton" disabled>再読込</button>
-					<span id="inputDirectoryStatusText">－</span>
+		<div id="contentTitleBox">
+			<div id="contentTitle">
+				CSV Processor
+			</div>
+			<div id="contentDescription">
+				多量・巨大なCSVを自在に処理するツール
+			</div>
+		</div>
+		<div id="stepBox">
+			<div id="step1" class="step">
+				<h2>Step1: Input <span class="stepSubTitle">入力</span></h2>
+				<h3>読み込み方法の設定</h3>
+				<div>
+					<div class="optionSet">
+						<label class="optionBox"><input type="radio" name="inputMethod" value="file" checked data-option="inputMethod"> ファイルを読み込む</label>
+						<label class="optionBox">
+							ファイルを選択：<input type="file" id="selectFileButton" accept=".csv" multiple>
+						</label>
+					</div>
+					<div class="optionSet">
+						<label class="optionBox"><input type="radio" name="inputMethod" value="directory" data-option="inputMethod"> フォルダを読み込む</label>
+						<label class="optionBox">
+							フォルダを選択：
+							<button id="inputDirectorySelectButton" disabled>フォルダを選択</button>
+						</label>
+						<label class="optionBox">
+							読み込みフィルタ(RegExp):<input type="text" id="inputFileRegExpInput" value=".csv$" style="width: 5em;" disabled data-option="inputFileRegExp">
+						</label>
+						<button id="directoryReloadButton" disabled>再読込</button>
+						<span id="inputDirectoryStatusText">－</span>
 					</div>
 					<div class="optionSet">
 						<label class="optionBox"><input type="radio" name="inputMethod" value="direct" data-option="inputMethod"> 直接入力</label><br>
@@ -55,6 +86,7 @@
 									<option value="utf-16le">UTF-16le</option>
 									<option value="AUTO">自動判定(低速)</option>
 								</select>
+							</td>
 						</tr>
 						<tr>
 							<th>区切り文字</th>
@@ -114,16 +146,16 @@
 					</div>
 				</div>
 			</div>
-			<div id="step2" class="stepBox">
-				<h2>Step 2: 処理</h2>
+			<div id="step2" class="step">
+				<h2>Step2: Process <span class="stepSubTitle">処理</span></h2>
 				<h3>入力ファイル単位での処理</h3>
 				<p>
 					ここで使える変数
-				<ul>
-					<li>csvArray：CSVファイルのデータ 基本的にはこれを書き換える</li>
-					<li>csvText：CSVファイルのデータ ※読み取り専用</li>
-					<li>csvProcessor：</li>
-				</ul>
+					<ul>
+						<li>csvArray：CSVファイルのデータ 基本的にはこれを書き換える</li>
+						<li>csvText：CSVファイルのデータ ※読み取り専用</li>
+						<li>csvProcessor：</li>
+					</ul>
 				</p>
 				<div id="perInputProcesses">
 					<div class="perInputProcess" data-perInputProcessNum="0" data-perInputProcessType="perInputCode">
@@ -133,14 +165,14 @@
 				<h3>行ごとに実行する処理</h3>
 				<p>
 					ここで使える変数
-				<ul>
-					<li>rowArray：行のデータ 基本的にはこれを書き換える 要素の数を変えてもOK</li>
-					<li>rowText：行のデータ ※読み取り専用</li>
-					<li>rowIndex：行番号 ※読み取り専用</li>
-					<li>csvArray：CSVファイルのデータ</li>
-					<li>csvText：CSVファイルのデータ ※読み取り専用</li>
-					<li>csvProcessor：</li>
-				</ul>
+					<ul>
+						<li>rowArray：行のデータ 基本的にはこれを書き換える 要素の数を変えてもOK</li>
+						<li>rowText：行のデータ ※読み取り専用</li>
+						<li>rowIndex：行番号 ※読み取り専用</li>
+						<li>csvArray：CSVファイルのデータ</li>
+						<li>csvText：CSVファイルのデータ ※読み取り専用</li>
+						<li>csvProcessor：</li>
+					</ul>
 				</p>
 				<div id="perRowProcesses">
 					<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="perRowCode">
@@ -151,8 +183,7 @@
 				<p>
 					ここで使える変数
 					<ul>
-						<li>cellText(=rowArray[cellIndex])：セルの値 ※この変数は読み取り専用 代わりに、return
-							で値を返すことで書き換えることができる</li>
+						<li>cellText(=rowArray[cellIndex])：セルの値 ※この変数は読み取り専用 代わりに、returnで値を返すことで書き換えることができる</li>
 						<li>cellIndex：セル番号 ※読み取り専用</li>
 						<li>rowArray(=csvArray[rowIndex])：行のデータ</li>
 						<li>rowText：行のデータ ※読み取り専用</li>
@@ -168,19 +199,19 @@
 					</div>
 				</div>
 				対応予定機能
-								<ul>
-									<li>列追加・削除</li>
-									<li>[列・行]単純置換</li>
-									<li>[列・行]書き換え</li>
-									<li>[列・行]大文字・小文字</li>
-									<li>[列・行]計算(四則演算・数学関数)</li>
-									<li>[列・行]コード実行(Math,String)</li>
-								</ul>
+				<ul>
+					<li>列追加・削除</li>
+					<li>[列・行]単純置換</li>
+					<li>[列・行]書き換え</li>
+					<li>[列・行]大文字・小文字</li>
+					<li>[列・行]計算(四則演算・数学関数)</li>
+					<li>[列・行]コード実行(Math,String)</li>
+				</ul>
 				<span></span>
 				<span>カラムの抽出(削除)・並び替え</span>
 			</div>
-			<div id="step3" class="stepBox">
-				<h2>Step 3: 出力</h2>
+			<div id="step3" class="step">
+				<h2>Step3 : Output <span class="stepSubTitle">出力</span></h2>
 				<h3>出力プレビュー</h3>
 				<div>
 					<!-- <label class="optionBox">文字数リミット : <input type="number" id="outputPreviewCharLimitInput" value="1000" style="width: 5em;">文字</label><br> -->
@@ -215,6 +246,7 @@
 								<option value="UTF16LE">UTF-16le</option>
 							</select>
 						</td>
+					</tr>
 					<tr>
 						<th>区切り文字</th>
 						<td><label>区切り文字：<input type="text" id="outputDelimiterInput" value="," style="width: 3em;" data-option="outputDelimiter"></label></td>
@@ -234,36 +266,36 @@
 							<label>囲み文字：<input type="text" id="outputWrapperInput" value='"' style="width: 3em;" data-option="outputWrapper"></label><br>
 							<label><input type="checkbox" id="outputIsUsingWrapperAllCheckbox" data-option="outputIsUsingWrapperAll">すべてのセルに囲み文字を使用</label><br>
 						</td>
-						</tr>
 					</tr>
-					<tr>
-						<th>タイトル行</th>
-						<td><label><input type="checkbox" id="outputIsUsingHeaderCheckbox" data-option="outputIsUsingHeader">先頭にタイトル行を出力</label>
-						</td>
-					</tr>
-					<tr>
-						<th>末尾の改行</th>
-						<td><label><input type="checkbox" id="outputAddLastLineBreakCheckbox" checked data-option="outputAddLastLineBreak">出力末尾に改行をつける</label></td>
-					</tr>
-					<tr>
-						<th>セル内の特殊文字</th>
-						<td>
-							<label><input type="checkbox" id="outputIsUsingSpecialCharacterInWrapperCheckbox" data-option="outputIsUsingSpecialCharacterInWrapper">セル内に改行・区切り文字・囲み文字を含む</label>
-						</td>
-					</tr>
-					<tr>
-						<th>先頭にテキスト追加</th>
-						<td>
-							<textarea id="outputPrefixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの先頭に追加するテキストを入力してください。多くの場合、末尾に改行が必要です" disabled data-option="outputPrefixText"></textarea>
-						</td>
-					</tr>
-					<tr>
-						<th>末尾にテキスト追加</th>
-						<td>
-							<textarea id="outputSuffixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの末尾に追加するテキストを入力してください" disabled data-option="outputSuffixText"></textarea>
-						</td>
+				</tr>
+				<tr>
+					<th>タイトル行</th>
+					<td><label><input type="checkbox" id="outputIsUsingHeaderCheckbox" data-option="outputIsUsingHeader">先頭にタイトル行を出力</label>
+					</td>
+				</tr>
+				<tr>
+					<th>末尾の改行</th>
+					<td><label><input type="checkbox" id="outputAddLastLineBreakCheckbox" checked data-option="outputAddLastLineBreak">出力末尾に改行をつける</label></td>
+				</tr>
+				<tr>
+					<th>セル内の特殊文字</th>
+					<td>
+						<label><input type="checkbox" id="outputIsUsingSpecialCharacterInWrapperCheckbox" data-option="outputIsUsingSpecialCharacterInWrapper">セル内に改行・区切り文字・囲み文字を含む</label>
+					</td>
+				</tr>
+				<tr>
+					<th>先頭にテキスト追加</th>
+					<td>
+						<textarea id="outputPrefixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの先頭に追加するテキストを入力してください。多くの場合、末尾に改行が必要です" disabled data-option="outputPrefixText"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th>末尾にテキスト追加</th>
+					<td>
+						<textarea id="outputSuffixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの末尾に追加するテキストを入力してください" disabled data-option="outputSuffixText"></textarea>
+					</td>
 				</table>
-
+				
 				<h3>出力ファイル設定</h3>
 				<div class="optionBox">ファイル名(振分・抽出)：<br>
 					<textarea id="outputFileNameCodeInput" rows="2" cols="50" placeholder="出力ファイル名を返すコードを入力" data-option="outputFileNameCode">return ["output.csv"]</textarea>
@@ -285,11 +317,14 @@
 						<label><input type="radio" name="outputFileExistActionRadiobutton" value="append" data-option="outputFileExistAction"> 追記</label>
 					</span>
 				</div>
-				<div id="outputButton">ファイル出力</div>
+			</div>
+			<div id="outputButtonBox">
+				<div id="outputButton">処理開始</div>
 				<div id="outputStatusTextBox">
 					<span id="outputStatusText">ここに出力状況が表示されます。</span>
 				</div>
 			</div>
 		</div>
-	</body>
+	</div>
+</body>
 </html>
