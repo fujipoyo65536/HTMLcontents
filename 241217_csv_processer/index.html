@@ -135,6 +135,10 @@
 							<th>末尾の改行</th>
 							<td><label><input type="checkbox" id="inputIgnoreLastLineBreakCheckbox" checked data-option="inputIgnoreLastLineBreak">入力末尾の改行は無視</label></td>
 						</tr>
+						<tr>
+							<th>処理方法</th>
+							<td><label><input type="checkbox" id="inputLoadOnceCheckBox" data-option="inputLoadOnce">ファイルを分割せず読み込む</label></td>
+						</tr>
 					</table>
 				</div>
 				<h3>プレビュー表示</h3>
@@ -148,14 +152,22 @@
 			</div>
 			<div id="step2" class="step">
 				<h2>Step2: Process <span class="stepSubTitle">処理</span></h2>
-				<h3>入力ファイル単位での処理</h3>
+				<h3>入力ファイル(チャンク)単位での処理</h3>
 				<p>
 					ここで使える変数
-					<ul>
-						<li>csvArray：CSVファイルのデータ 基本的にはこれを書き換える</li>
-						<li>csvText：CSVファイルのデータ ※読み取り専用</li>
-						<li>csvProcessor：</li>
-					</ul>
+					<table>
+						<tr><th>file</th><td></td></tr>
+						<tr><th>fileObj</th><td>Fileオブジェクト</td></tr>
+						<tr><th>csvIndex</th><td>入力ファイルのインデックス(何番目か)</td></tr>
+						<tr><th>csvText</th><td>入力ファイルのテキスト</td></tr>
+						<tr><th>csvArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト(セルごと)</td></tr>
+						<tr><th>rowTextArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト(行ごと)</td></tr>
+						<tr><th>options</th><td>現在の各設定値</td></tr>
+						<tr><th>allLoaded</th><td>1チャンクで全てのデータが読み込まれた</td></tr>
+						<tr><th>completed</th><td>ファイル読み込み完了(これが最後のチャンク)</td></tr>
+						<tr><th>firstLoad</th><td>最初の読み込み(これが最初のチャンク)</td></tr>
+					</table>
+					配列を返すことで、csvArrayを書き換えることが可能
 				</p>
 				<div id="perInputProcesses">
 					<div class="perInputProcess" data-perInputProcessNum="0" data-perInputProcessType="perInputCode">
@@ -164,15 +176,13 @@
 				</div>
 				<h3>行ごとに実行する処理</h3>
 				<p>
-					ここで使える変数
-					<ul>
-						<li>rowArray：行のデータ 基本的にはこれを書き換える 要素の数を変えてもOK</li>
-						<li>rowText：行のデータ ※読み取り専用</li>
-						<li>rowIndex：行番号 ※読み取り専用</li>
-						<li>csvArray：CSVファイルのデータ</li>
-						<li>csvText：CSVファイルのデータ ※読み取り専用</li>
-						<li>csvProcessor：</li>
-					</ul>
+					ここで使える変数(前述に加えて)
+					<table>
+						<tr><th>rowIndex</th><td>行インデックス(何行目か) チャンク分割を考慮</td></tr>
+						<tr><th>rowArray</th><td>行のオブジェクト(セルごと)</td></tr>
+						<tr><th>rowText</th><td>行のテキスト</td></tr>
+					</table>
+					配列を返すことで、rowArrayを書き換えることが可能
 				</p>
 				<div id="perRowProcesses">
 					<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="perRowCode">
@@ -181,34 +191,29 @@
 				</div>
 				<h3>セルごとに実行する処理</h3>
 				<p>
-					ここで使える変数
-					<ul>
-						<li>cellText(=rowArray[cellIndex])：セルの値 ※この変数は読み取り専用 代わりに、returnで値を返すことで書き換えることができる</li>
-						<li>cellIndex：セル番号 ※読み取り専用</li>
-						<li>rowArray(=csvArray[rowIndex])：行のデータ</li>
-						<li>rowText：行のデータ ※読み取り専用</li>
-						<li>rowIndex：行番号 ※読み取り専用</li>
-						<li>csvArray：CSVファイルのデータ</li>
-						<li>csvText：CSVファイルのデータ ※読み取り専用</li>
-						<li>csvProcessor：</li>
-					</ul>
+					ここで使える変数(前述に加えて)
+					<table>
+						<tr><th>cellIndex</th><td>セルのインデックス(何列目か)</td></tr>
+						<tr><th>cellText</th><td>セルのテキスト</td></tr>
+					</table>
+					文字列・数値・真偽値を返すことで、cellTextを書き換えることが可能
 				</p>
 				<div id="perCellProcesses">
 					<div class="perCellProcess" data-perCellProcessNum="0" data-perCellProcessType="perCellCode">
 						<textarea class="code" data-processOption="perCellCode"></textarea>
 					</div>
 				</div>
-				対応予定機能
-				<ul>
-					<li>列追加・削除</li>
-					<li>[列・行]単純置換</li>
-					<li>[列・行]書き換え</li>
-					<li>[列・行]大文字・小文字</li>
-					<li>[列・行]計算(四則演算・数学関数)</li>
-					<li>[列・行]コード実行(Math,String)</li>
-				</ul>
-				<span></span>
-				<span>カラムの抽出(削除)・並び替え</span>
+				<h3>出力ファイルごとに実行する処理</h3>
+				<p>
+					ここで使える変数
+					<ul>
+					</ul>
+				</p>
+				<div id="perOutputProcesses">
+					<div class="perOutputProcess" data-perOutputProcessNum="0" data-perOutputProcessType="perOutputCode">
+						<textarea class="code" data-processOption="perOutputCode"></textarea>
+					</div>
+				</div>
 			</div>
 			<div id="step3" class="step">
 				<h2>Step3 : Output <span class="stepSubTitle">出力</span></h2>

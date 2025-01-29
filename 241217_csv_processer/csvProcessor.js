@@ -1,19 +1,23 @@
 'use strict';
 
 // 現状の問題
-// 先頭スキップがうまく働いていない気がする
-
+// プレビュー周りの実装が全体的によくない。文字コードを選択するとエラーになる。
 
 // todo
-// 入力バッファ・出力バッファのサイズ指定
+// tooltip
 // プロファイル読込・書き出し
 // userFuncから触れる永続的な変数を準備
-// 累積出力行数変数を追加
-// perProcessFuncを追加→何につかうの?
-// ソートしたい
-// 列数が合わない行
+// 一括読み込み機能
+// 累積出力行数変数
+// perProcessFuncを追加
+// perInputFunc → sort
+// perRowFunc → select
+// perCellFunc → (replace,upper,lower,substring)
+// perOutputFuncを追加
+// 列数が合わない行の扱い
 // UI調整 折りたたみ
 // ディレクトリの書き出し
+
 
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
@@ -294,6 +298,17 @@ const csvProcessor = {
 				csvProcessor.perCellFunc = undefined;
 				console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
 				csvProcessor.perCellFuncFlag = false;
+			}
+
+			// 出力ファイルごとに実行する処理
+			let perOutputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perOutputCode']").value);
+			if(typeof perOutputFunc === 'function'){
+				csvProcessor.perOutputFunc = perOutputFunc;
+				csvProcessor.perOutputFuncFlag = true;
+			}else if(typeof perOutputFunc === 'string'){
+				csvProcessor.perOutputFunc = undefined;
+				console.log("出力ファイルごとに実行する処理は定義されませんでした",perOutputFunc);
+				csvProcessor.perOutputFuncFlag = false;
 			}
 	
 			// 出力ファイル名を設定する処理
@@ -602,6 +617,17 @@ const csvProcessor = {
 				console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
 				csvProcessor.perCellFuncFlag = false;
 			}
+
+			// 出力ファイルごとに実行する処理
+			let perOutputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perOutputCode']").value);
+			if(typeof perOutputFunc === 'function'){
+				csvProcessor.perOutputFunc = perOutputFunc;
+				csvProcessor.perOutputFuncFlag = true;
+			}else if(typeof perOutputFunc === 'string'){
+				csvProcessor.perOutputFunc = undefined;
+				console.log("出力ファイルごとに実行する処理は定義されませんでした",perOutputFunc);
+				csvProcessor.perOutputFuncFlag = false;
+			}
 	
 			// 出力ファイル名を設定する処理
 			let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode);
@@ -688,28 +714,6 @@ const csvProcessor = {
 				// ここからCSV処理
 				// console.log(csvBuffer);
 
-				// csvごとに行う処理
-				// ユーザー処理
-				if(csvProcessor.perInputFuncFlag){
-					try{
-						let tmp = csvProcessor.perInputFunc({
-							file: csvFile,
-							fileObj: csvFile.fileObj,
-							csvIndex,
-							csvText: csvBuffer.join(''),
-							csvArray: csvBuffer,
-							options,
-							allLoaded,
-							completed,
-							firstLoad,
-							// csvProcessor
-						});
-					}
-					catch(e){
-						console.error(`入力ファイルごとに実行する処理の実行に失敗しました。`,e);
-					}
-				}
-
 				let csvTextToArrayResult = csvProcessor.csvTextToArray(csvBuffer,{
 					delimiter: options.inputDelimiter || ',',
 					lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
@@ -726,6 +730,7 @@ const csvProcessor = {
 					first:firstLoad,
 				})
 
+				
 				// console.log(csvTextToArrayResult);
 				
 				csvBuffer = csvTextToArrayResult.restArray;
@@ -735,6 +740,32 @@ const csvProcessor = {
 
 				csvTextToArrayResult=undefined
 				// continue;
+
+								// csvごとに行う処理
+				// ユーザー処理
+				if(csvProcessor.perInputFuncFlag){
+					try{
+						let tmp = csvProcessor.perInputFunc({
+							file: csvFile,
+							fileObj: csvFile.fileObj,
+							csvIndex,
+							csvText: csvBuffer.join(''),
+							csvArray,
+							rowTextArray,
+							options,
+							allLoaded,
+							completed,
+							firstLoad,
+							csvProcessor //★メモリリークするなら入れない
+						});
+						if (Array.isArray(tmp)) {
+							csvArray = tmp;
+						}
+					}
+					catch(e){
+						console.error(`入力ファイルごとに実行する処理の実行に失敗しました。`,e);
+					}
+				}
 
 
 				
@@ -757,16 +788,21 @@ const csvProcessor = {
 								file: csvFile,
 								fileObj: csvFile.fileObj,
 								csvIndex,
-								csvText,
+								csvText: csvBuffer.join(''),
 								csvArray,
+								rowTextArray,
+								options,
+								allLoaded,
+								completed,
+								firstLoad,
+								csvProcessor, //★メモリリークするなら入れない
+
 								rowIndex: loadedRowNumber+rowIndex,
 								rowArray,
 								rowText,
-								options,
-								// csvProcessor
 							});
 							if (Array.isArray(tmp)) {
-								// csvArray[rowIndex] = tmp;
+								csvArray[rowIndex] = tmp;
 								rowArray = tmp;
 							}
 						}
@@ -783,15 +819,21 @@ const csvProcessor = {
 									file: csvFile,
 									fileObj: csvFile.fileObj,
 									csvIndex,
-									csvText,
+									csvText: csvBuffer.join(''),
 									csvArray,
-									rowIndex,
+									rowTextArray,
+									options,
+									allLoaded,
+									completed,
+									firstLoad,
+									csvProcessor, //★メモリリークするなら入れない
+
+									rowIndex: loadedRowNumber+rowIndex,
 									rowArray,
 									rowText,
+									
 									cellIndex,
 									cellText,
-									options,
-									// csvProcessor
 								});
 								// 戻り値が文字列であれば、cellDataを上書き
 								switch(typeof tmp){
@@ -975,19 +1017,19 @@ const csvProcessor = {
 		}
 	},
 	
-	makeUserFunc: (userCode,args)=>{
+	makeUserFunc: (userCode)=>{
 		if(!userCode || userCode == ""){
 			return "userFunc is empty";
 		}
 		let code= `try{\n${userCode}\n}catch(e){console.log("userFunc failed:",e.message);console.error(e);}`;
-		let func;
+		let returnFunc;
 		try{
-			func = new Function("a",code);
+			returnFunc = new Function("a,m,f",code);
 		}catch(e){
 			console.log("makeUserFunc Failed:",e);
 			return e.message;
 		}
-		return func;
+		return returnFunc;
 	},
 
 	viewTable: (csvArray,elem)=>{
@@ -1046,6 +1088,33 @@ const csvProcessor = {
 		});
 
 		return options;
+	},
+
+	setOptionsToHtml: (options)=>{
+		// HTMLに各オプションの値をセット
+		// HTMLの[data-option]属性を持つ要素を取得
+		const optionElements = document.querySelectorAll('[data-option]');
+		optionElements.forEach(function(element){
+			const key = element.dataset.option;
+			const value = options[key];
+			
+			// type属性によって適切に処理する
+			switch(element.type){
+				case 'checkbox':
+					element.checked = value;
+					break;
+				case 'number':
+					element.value = value;
+					break;
+				default:
+					element.value = value;
+					break;
+			}
+
+			// イベント発火
+			const event = new Event('change');
+			element.dispatchEvent(event);
+		});
 	},
 
 	csvTextToArray: (csvTextInput,options={
@@ -1126,17 +1195,19 @@ const csvProcessor = {
 
 		// 先頭行を読み飛ばして捨てる
 		if(options.skipRowNumber > 0 && options.first){
-			let tmpArray = [];
 			let rowCount = 0;
-			for( let i = 0; i < csvTextArray.length; i++){
-				if(csvTextArray[i] == '\n'){
+			let tmp="";
+			const length = csvTextArray.length;
+			for( let i = 0; i < length; i++){
+				// 先頭から1文字取り出す
+				tmp = csvTextArray.shift();
+				if(tmp == '\n'){
 					rowCount++;
-					if(rowCount >= options.skipRowNumber){
-						tmpArray.push(csvTextArray[i]);
+					if(rowCount == options.skipRowNumber){
+						break;
 					}
 				}
 			}
-			csvTextArray = tmpArray;
 		}
 		
 		
