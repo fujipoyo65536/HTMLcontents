@@ -254,16 +254,20 @@
 					</tr>
 					<tr>
 						<th>区切り文字</th>
-						<td><label>区切り文字：<input type="text" id="outputDelimiterInput" value="," style="width: 3em;" data-option="outputDelimiter"></label></td>
+						<td>
+							<label>区切り文字：<input type="text" id="outputDelimiterInput" value="," style="width: 3em;" data-option="outputDelimiter"></label>
+						</td>
 					</tr>
 					<tr>
 						<th>改行文字</th>
-						<td><select id="outputLineBreakInput" data-option="outputLineBreakSelect">
-							<option value="CRLF" selected>CRLF</option>
-							<option value="CR">CR</option>
-							<option value="LF">LF</option>
-						</select>
-					</td>
+						<td>
+							<select id="outputLineBreakInput" data-option="outputLineBreakSelect">
+								<option value="CRLF" selected>CRLF</option>
+								<option value="CR">CR</option>
+								<option value="LF">LF</option>
+							</select>
+						</td>
+					</tr>
 					<tr>
 						<th>囲み文字</th>
 						<td>
@@ -272,33 +276,46 @@
 							<label><input type="checkbox" id="outputIsUsingWrapperAllCheckbox" data-option="outputIsUsingWrapperAll">すべてのセルに囲み文字を使用</label><br>
 						</td>
 					</tr>
-				</tr>
-				<tr>
-					<th>タイトル行</th>
-					<td><label><input type="checkbox" id="outputIsUsingHeaderCheckbox" data-option="outputIsUsingHeader">先頭にタイトル行を出力</label>
-					</td>
-				</tr>
-				<tr>
-					<th>末尾の改行</th>
-					<td><label><input type="checkbox" id="outputAddLastLineBreakCheckbox" checked data-option="outputAddLastLineBreak">出力末尾に改行をつける</label></td>
-				</tr>
-				<tr>
-					<th>セル内の特殊文字</th>
-					<td>
-						<label><input type="checkbox" id="outputIsUsingSpecialCharacterInWrapperCheckbox" data-option="outputIsUsingSpecialCharacterInWrapper">セル内に改行・区切り文字・囲み文字を含む</label>
-					</td>
-				</tr>
-				<tr>
-					<th>先頭にテキスト追加</th>
-					<td>
-						<textarea id="outputPrefixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの先頭に追加するテキストを入力してください。多くの場合、末尾に改行が必要です" disabled data-option="outputPrefixText"></textarea>
-					</td>
-				</tr>
-				<tr>
-					<th>末尾にテキスト追加</th>
-					<td>
-						<textarea id="outputSuffixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの末尾に追加するテキストを入力してください" disabled data-option="outputSuffixText"></textarea>
-					</td>
+					<tr>
+						<th>タイトル行</th>
+						<td><label><input type="checkbox" id="outputIsUsingHeaderCheckbox" data-option="outputIsUsingHeader">先頭にタイトル行を出力</label>
+						</td>
+					</tr>
+					<tr>
+						<th>末尾の改行</th>
+						<td><label><input type="checkbox" id="outputAddLastLineBreakCheckbox" checked data-option="outputAddLastLineBreak">出力末尾に改行をつける</label></td>
+					</tr>
+					<tr>
+						<th>セル内の特殊文字</th>
+						<td>
+							<label><input type="checkbox" id="outputIsUsingSpecialCharacterInWrapperCheckbox" data-option="outputIsUsingSpecialCharacterInWrapper">セル内に改行・区切り文字・囲み文字を含む</label>
+						</td>
+					</tr>
+					<tr>
+						<th>先頭にテキスト追加</th>
+						<td>
+							<textarea id="outputPrefixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの先頭に追加するテキストを入力してください。多くの場合、末尾に改行が必要です" data-option="outputPrefixText"></textarea>
+						</td>
+					</tr>
+					<tr>
+						<th>末尾にテキスト追加</th>
+						<td>
+							<textarea id="outputSuffixTextTextarea" rows="2" cols="50" placeholder="出力ファイルの末尾に追加するテキストを入力してください" data-option="outputSuffixText"></textarea>
+						</td>
+					</tr>
+					<tr>
+						<th>処理方法</th>
+						<td>
+							<select id="outputWritingTimingSelect" data-option="outputWritingTiming">
+								<option value="100000">100,000行ごとに書き込み</option>
+								<option value="10000" selected>10,000行ごとに書き込み</option>
+								<option value="1000">1,000行ごとに書き込み</option>
+								<option value="100">100行ごとに書き込み</option>
+								<option value="input">入力ファイル処理完了ごとに書き込み</option>
+								<option value="all">最後に一括書き込み</option>
+							</select>
+						</td>
+					</tr>
 				</table>
 				
 				<h3>出力ファイル設定</h3>

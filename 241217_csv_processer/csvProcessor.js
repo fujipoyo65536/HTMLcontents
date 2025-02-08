@@ -650,6 +650,10 @@ const csvProcessor = {
 		//Inputファイルごとループ
 		for(const [csvIndex,file] of csvProcessor.inputFiles.entries()){
 			const csvArrayAfterProcess = await csvProcessor.processCsvStream(csvIndex);
+			// 処理方法が「入力ファイルごとに書き込み」の場合、ここでファイル書き込み処理を行う
+			if(options.outputWritingTiming == "input"){
+				csvProcessor.writeToAllFile();
+			}
 			csvProcessor.addLogText("output",`ファイル処理完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
 			//csvProcessorをクリーンにする
 			csvProcessor.inputFileTextObj = null;
@@ -856,22 +860,12 @@ const csvProcessor = {
 
 
 					// 出力
-					let outputText = csvProcessor.rowArrayToCsvText(rowArray,{
-						delimiter: options.outputDelimiter || ',',
-						// lineBreak: options.outputLineBreak || '\n',
-						// isUsingHeader: options.outputIsUsingHeader || false,
-						wrapper: options.outputWrapper || '"',
-						isUsingWrapper: options.outputIsUsingWrapper || false,
-						isUsingWrapperAll: options.outputIsUsingWrapperAll || false,
-						isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
-						// addLastLineBreak: options.outputAddLastLineBreak || false,
-					});
 					if(rowIndex+loadedRowNumber == 0){
-						if(!csvProcessor.headerText){
-							csvProcessor.headerText = outputText;
+						if(!csvProcessor.headerArray){
+							// ヘッダー行は、記憶して終わり(書き出さない)
+							csvProcessor.headerArray = JSON.parse(JSON.stringify(rowArray));
 						}
 					}else{
-
 						let outputFileNames = ["output.csv"];
 						if(csvProcessor.outputFileNameFuncFlag){
 							try{
@@ -900,15 +894,11 @@ const csvProcessor = {
 						for(const outputFileName of outputFileNames){
 							const outputFileFullName = `${outputFileName}`;
 							// 出力ファイルに書き込み
-							await csvProcessor.outputToFile(outputFileFullName,outputText);
+							await csvProcessor.outputToFile(outputFileFullName,rowArray);
 						}
-					}
-					outputText = undefined;
-
-
-
+						rowArray = undefined;
+					}// if
 				} // 行ごと
-
 				
 				loadedRowNumber += csvArray.length;
 
@@ -929,12 +919,14 @@ const csvProcessor = {
 		return csvArray;
 	},
 
-	outputToFile: async (outputFileFullName,text)=>{
-		// 出力ファイルのwriteableStreamが存在するかチェック
+	getWriteableStream: async (outputFileFullName) => {
+		let writeableStream;
+		let tmpOutputText = ""; //今すぐ書き出すテキスト
+
+		// 出力ファイルがなければ開く
 		if(!csvProcessor.outputFilesWriteableStream){
 			csvProcessor.outputFilesWriteableStream = [];
 		}
-		let writeableStream;
 		if(!csvProcessor.outputFilesWriteableStream[outputFileFullName]){
 			// なければ作成
 			console.log("File creating",outputFileFullName);
@@ -944,34 +936,108 @@ const csvProcessor = {
 			console.log("File created",outputFileFullName);
 			csvProcessor.addLogText("output",`ファイル作成完了: ${outputFileFullName}`);
 			csvProcessor.outputFilesWriteableStream[outputFileFullName] = writeableStream;
-			if(!csvProcessor.outputFilesBuffer){csvProcessor.outputFilesBuffer = [];}
-			csvProcessor.outputFilesBuffer[outputFileFullName] = "";
-
+			
 			// prefixを書き込み
 			if(csvProcessor.options.outputPrefixText!=""){
-				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputPrefixText
+				tmpOutputText += csvProcessor.options.outputPrefixText
 			}
 			// ヘッダーを書き込み
-			if(csvProcessor.headerText){
-				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.headerText + csvProcessor.options.outputLineBreak;
+			if(csvProcessor.headerArray && csvProcessor.options.outputIsUsingHeader){
+				tmpOutputText += csvProcessor.headerArray.join(csvProcessor.options.outputDelimiter) + csvProcessor.options.outputLineBreak;
 			}
-			// 1行目を書き込み
-			csvProcessor.outputFilesBuffer[outputFileFullName] += text;
-
-		}else{
-			// あれば追記
-			writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
-			csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputLineBreak + text;
-		}
-
-		if(csvProcessor.outputFilesBuffer[outputFileFullName].length > csvProcessor.settings.outputBufferSize){
-			const arraybuffer = csvProcessor.encodeText(csvProcessor.outputFilesBuffer[outputFileFullName],csvProcessor.options.outputEncoding);
+			// 今すぐ書き出す
+			const arraybuffer = csvProcessor.encodeText(tmpOutputText,csvProcessor.options.outputEncoding);
 			await writeableStream.write(arraybuffer);
-			csvProcessor.outputFilesBuffer[outputFileFullName] = "";
-			console.log("File wrote",outputFileFullName);
-			csvProcessor.addLogText("output",`ファイル書き込みを実施: ${outputFileFullName}`);
+			
+		}else{
+			writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
 		}
 
+		return writeableStream;
+	},
+
+	outputToFile: async (outputFileFullName,rowArray)=>{
+		// バッファに書き込み
+		await csvProcessor.writeToBuffer(outputFileFullName,rowArray);
+		// writeableStreamを取得(ファイルがない場合は作成)
+		const writeableStream = await csvProcessor.getWriteableStream(outputFileFullName);
+		// 出力ファイルに書き込み
+		if( 
+			(csvProcessor.options.outputWritingTiming == "100" && csvProcessor.outputFilesBuffer[outputFileFullName].length > 100) ||
+			(csvProcessor.options.outputWritingTiming == "1000" && csvProcessor.outputFilesBuffer[outputFileFullName].length > 1000) ||
+			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFilesBuffer[outputFileFullName].length > 10000)
+		){
+			await csvProcessor.writeToFile(outputFileFullName);
+		}
+	},
+
+	writeToBuffer: async (outputFileFullName, rowArray)=>{
+		if(!csvProcessor.outputFilesBuffer) csvProcessor.outputFilesBuffer = [];
+		if(!csvProcessor.outputFilesBuffer[outputFileFullName]){
+			csvProcessor.outputFilesBuffer[outputFileFullName] = [];
+		}
+		csvProcessor.outputFilesBuffer[outputFileFullName].push(rowArray);
+	},
+
+	writeToAllFile: async ()=>{
+		if(!csvProcessor.outputFilesBuffer || Object.keys(csvProcessor.outputFilesBuffer).length == 0){
+			return;
+		}
+		for(const [outputFileFullName,writeableStream] of Object.entries(csvProcessor.outputFilesBuffer)){
+			await csvProcessor.writeToFile(outputFileFullName);
+		}
+	},
+
+	writeToFile: async (outputFileFullName) => {
+		if(!csvProcessor.outputFilesBuffer || !csvProcessor.outputFilesBuffer[outputFileFullName]){
+			return;
+		}
+		const writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
+		const options = csvProcessor.options;
+		let rowArrays = csvProcessor.outputFilesBuffer[outputFileFullName];
+
+		// 出力ファイルごとに実行するコードの実行
+		if(csvProcessor.perOutputFuncFlag){
+			try{
+				let tmp = csvProcessor.perOutputFunc({
+					rowArrays,
+					options,
+					// csvProcessor
+				});
+				if (Array.isArray(tmp)) {
+					// csvArray[rowIndex] = tmp;
+					rowArrays = tmp;
+				}
+			}
+			catch(e){
+				console.error(`出力ファイルごとに実行する処理の実行に失敗しました。`,e);
+			}
+		}
+
+		// 出力テキストを作る
+		let outputText = "";
+		for(let i = 0; i < csvProcessor.outputFilesBuffer[outputFileFullName].length; i++){
+			const rowArray = rowArrays[i];
+			outputText += csvProcessor.rowArrayToCsvText(rowArray,{
+				delimiter: options.outputDelimiter || ',',
+				// lineBreak: options.outputLineBreak || '\n',
+				// isUsingHeader: options.outputIsUsingHeader || false,
+				wrapper: options.outputWrapper || '"',
+				isUsingWrapper: options.outputIsUsingWrapper || false,
+				isUsingWrapperAll: options.outputIsUsingWrapperAll || false,
+				isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
+				// addLastLineBreak: options.outputAddLastLineBreak || false,
+			});
+			if(i != csvProcessor.outputFilesBuffer[outputFileFullName].length-1 || csvProcessor.options.outputAddLastLineBreak){
+				outputText += csvProcessor.options.outputLineBreak;
+			}
+		}
+		csvProcessor.outputFilesBuffer[outputFileFullName] = [];
+		
+		const arraybuffer = csvProcessor.encodeText(outputText,csvProcessor.options.outputEncoding);
+		await writeableStream.write(arraybuffer);
+		console.log("File wrote",outputFileFullName);
+		csvProcessor.addLogText("output",`ファイル書き込みを実施: ${outputFileFullName}`);
 	},
 
 	closeAllOutputStream: async()=>{
@@ -980,31 +1046,41 @@ const csvProcessor = {
 			return;
 		}
 		for(const [outputFileFullName,writeableStream] of Object.entries(csvProcessor.outputFilesWriteableStream)){
-			// 改行を追加
-			if(csvProcessor.options.outputAddLastLineBreak){
-				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputLineBreak;
-			}
-
-			// suffixTextを書き込み
-			if(csvProcessor.options.outputSuffixText!=""){
-				csvProcessor.outputFilesBuffer[outputFileFullName] += csvProcessor.options.outputSuffixText
-			}
-
-			// ストリーム書き込み
-			const arraybuffer = csvProcessor.encodeText(csvProcessor.outputFilesBuffer[outputFileFullName],csvProcessor.options.outputEncoding);
-			// writeableStream.write(arraybuffer); 
-			// writeableStream.close(); 
-			writeableStream.write(arraybuffer).then(()=>{
-				writeableStream.close();
-				console.log("File closed",outputFileFullName);
-				csvProcessor.addLogText("output",`ファイルをクローズ: ${outputFileFullName}`);
-			});
-
-			// バッファを削除
-			delete csvProcessor.outputFilesBuffer[outputFileFullName]
-			delete csvProcessor.outputFilesWriteableStream[outputFileFullName];
+			await csvProcessor.closeOutputStream(outputFileFullName);
 		}
 	},
+
+	closeOutputStream: async (outputFileFullName) => {
+		if(!csvProcessor.outputFilesWriteableStream || !csvProcessor.outputFilesWriteableStream[outputFileFullName]){
+			return;
+		}
+		const writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
+		
+		// バッファに残っているものを書き込む
+		await csvProcessor.writeToFile(outputFileFullName);
+		let outputText = "";
+
+		// 改行を追加
+		// if(csvProcessor.options.outputAddLastLineBreak){
+		// 	outputText += csvProcessor.options.outputLineBreak;
+		// }
+
+		// suffixTextを書き込み
+		if(csvProcessor.options.outputSuffixText!=""){
+			outputText += csvProcessor.options.outputSuffixText
+		}
+
+		// ストリーム書き込み
+		const arraybuffer = csvProcessor.encodeText(outputText,csvProcessor.options.outputEncoding);
+		await writeableStream.write(arraybuffer);
+		writeableStream.close();
+		console.log("File closed",outputFileFullName);
+		csvProcessor.addLogText("output",`ファイルをクローズ: ${outputFileFullName}`);
+
+		// ストリーム削除
+		delete csvProcessor.outputFilesWriteableStream[outputFileFullName];
+	},
+
 
 	encodeText: (text,encode)=>{
 		if(encode == 'UTF-8'){
