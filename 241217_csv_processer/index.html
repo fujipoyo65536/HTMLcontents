@@ -19,15 +19,16 @@
 			<select id="profileSelect">
 				<option value="default">デフォルト</option>
 			</select>
-			<button id="profileOpenButton">開く</button>
+			<button id="profileLoadButton">開く</button>
+			<button id="profileRemoveButton">削除</button>
 			<div class="profileMenuComment">
-				今の設定を保存
+				ブラウザに保存
 			</div>
 			<button id="profileSaveButton">保存</button>
 			<div class="profileMenuComment">
 				ファイル
 			</div>
-			<button id="profileInportButton">インポート</button>
+			<button id="profileImportButton">インポート</button>
 			<button id="profileExportButton">エクスポート</button>
 		</div>
 	</div>
@@ -97,7 +98,7 @@
 							<td>
 								「CRLF」で正常に読み込めない場合のみ変更してください。<br>
 								<select id="inputLineBreakInput" data-option="inputLineBreakSelect">
-									<!-- <option value="ALL" selected>CR,LF,CRLF</option> -->
+									<option value="ALL" selected>CR,LF,CRLF</option>
 									<option value="CRLF"selected>CRLF</option>
 									<option value="CR">CR</option>
 									<option value="LF">LF</option>
@@ -127,8 +128,15 @@
 							<th>セル内の特殊文字</th>
 							<td>
 								<label><input type="checkbox" id="inputIsUsingLineBreakInWrapperCheckbox" data-option="inputIsUsingLineBreakInWrapper">セル内に改行文字を含む</label><br>
-								<label><input type="checkbox" id="inputIsUsingDelimiterInWrapperCheckbox" data-option="inputIsUsingDelimiterInWrapper">セル内に区切り文字を含む</label><br>
+								<label><input type="checkbox" id="inputIsUsingDelimiterInWrapperCheckbox" data-option="inputIsUsingDelimiterInWrapper">セル内に区切り文字を含む</label>
+								<div class="tooltip">？<div class="tooltipText">
+									読み込みに必要な時間が大幅に増加します。<br>必要な場合のみチェックしてください。
+								</div></div>
+								<br>
 								<label><input type="checkbox" id="inputIsUsingWrapperInWrapperCheckbox" checked data-option="inputIsUsingWrapperInWrapper">セル内に囲み文字を含む</label>
+								<div class="tooltip">？<div class="tooltipText">
+									読み込みに必要な時間が大幅に増加します。<br>必要な場合のみチェックしてください。
+								</div></div>
 							</td>
 						</tr>
 						<tr>
@@ -137,7 +145,14 @@
 						</tr>
 						<tr>
 							<th>処理方法</th>
-							<td><label><input type="checkbox" id="inputLoadOnceCheckBox" data-option="inputLoadOnce">ファイルを分割せず読み込む</label></td>
+							<td>
+								<label><input type="checkbox" id="inputLoadOnceCheckBox" data-option="inputLoadOnce">ファイルを分割せず読み込む</label>
+								<div class="tooltip">？<div class="tooltipText">
+									本ツールでは通常、メモリ不足防止のため、ファイルを分割して読み込みます。<br>
+									読み込んだファイルに対してソート処理などをする場合のみチェックしてください。<br>
+									処理するファイルが大きい場合はメモリ不足となる場合があります。
+								</div></div>
+							</td>
 						</tr>
 					</table>
 				</div>
@@ -166,12 +181,13 @@
 						<tr><th>allLoaded</th><td>1チャンクで全てのデータが読み込まれた</td></tr>
 						<tr><th>completed</th><td>ファイル読み込み完了(これが最後のチャンク)</td></tr>
 						<tr><th>firstLoad</th><td>最初の読み込み(これが最初のチャンク)</td></tr>
+						<tr><th>sessionRowCount</th><td>セッション内の累計読込行数(最初の行は0)</td></tr>
 					</table>
 					配列を返すことで、csvArrayを書き換えることが可能
 				</p>
 				<div id="perInputProcesses">
 					<div class="perInputProcess" data-perInputProcessNum="0" data-perInputProcessType="perInputCode">
-						<textarea class="code" data-processOption="perInputCode"></textarea>
+						<textarea class="code" data-processOption="perInputCode" data-option="perInputCode"></textarea>
 					</div>
 				</div>
 				<h3>行ごとに実行する処理</h3>
@@ -186,7 +202,7 @@
 				</p>
 				<div id="perRowProcesses">
 					<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="perRowCode">
-						<textarea class="code" data-processOption="perRowCode"></textarea>
+						<textarea class="code" data-processOption="perRowCode" data-option="perRowCode"></textarea>
 					</div>
 				</div>
 				<h3>セルごとに実行する処理</h3>
@@ -200,18 +216,19 @@
 				</p>
 				<div id="perCellProcesses">
 					<div class="perCellProcess" data-perCellProcessNum="0" data-perCellProcessType="perCellCode">
-						<textarea class="code" data-processOption="perCellCode"></textarea>
+						<textarea class="code" data-processOption="perCellCode" data-option="perCellCode"></textarea>
 					</div>
 				</div>
-				<h3>出力ファイルごとに実行する処理</h3>
+				<h3>出力ファイル(チャンク)ごとに実行する処理</h3>
 				<p>
 					ここで使える変数
-					<ul>
-					</ul>
+					<table>
+						<tr><th>rowArrays</th><td>書き込み予定のデータ(2次元)</td></tr>
+					</table>
 				</p>
 				<div id="perOutputProcesses">
 					<div class="perOutputProcess" data-perOutputProcessNum="0" data-perOutputProcessType="perOutputCode">
-						<textarea class="code" data-processOption="perOutputCode"></textarea>
+						<textarea class="code" data-processOption="perOutputCode" data-option="perOutputCode"></textarea>
 					</div>
 				</div>
 			</div>
@@ -312,8 +329,14 @@
 								<option value="1000">1,000行ごとに書き込み</option>
 								<option value="100">100行ごとに書き込み</option>
 								<option value="input">入力ファイル処理完了ごとに書き込み</option>
-								<option value="all">最後に一括書き込み</option>
+								<option value="all">最後に一括書き込み(書き出しを分割しない)</option>
 							</select>
+							<div class="tooltip">？<div class="tooltipText">
+								大きな値を選択すると、処理が早くなりますが、メモリ使用量が増加します。<br>
+								正常に処理できる範囲でもっとも大きな値を選択してください。<br>
+								また、書き出しファイルに対してソート処理を行う場合は「最後に一括書き込み」とする必要があります。<br>
+								処理するファイルが大きい場合はメモリ不足となる場合があります。
+							</div></div>
 						</td>
 					</tr>
 				</table>

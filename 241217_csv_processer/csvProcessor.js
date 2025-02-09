@@ -1,22 +1,24 @@
 'use strict';
 
-// 現状の問題
+// ●現状の問題
+// 複雑なCSVが読めなくなっている気がする
 // プレビュー周りの実装が全体的によくない。文字コードを選択するとエラーになる。
+// 文字コード自動判定も動いているのか怪しい
 
-// todo
+// ●todo
 // tooltip
-// プロファイル読込・書き出し
-// userFuncから触れる永続的な変数を準備
-// 一括読み込み機能
-// 累積出力行数変数
-// perProcessFuncを追加
-// perInputFunc → sort
-// perRowFunc → select
-// perCellFunc → (replace,upper,lower,substring)
-// perOutputFuncを追加
 // 列数が合わない行の扱い
 // UI調整 折りたたみ
 // ディレクトリの書き出し
+// プロファイル読込・書き出しの改善・削除機能
+
+// ●やる気がないもの
+// perProcessFuncを追加 →使い道が思いつかないので保留
+// 累積出力行数
+// perInputFunc → sort
+// perRowFunc → select
+// perCellFunc → (replace,upper,lower,substring)
+
 
 
 // DOM読み込み後のイベント設定
@@ -39,7 +41,9 @@ document.addEventListener('DOMContentLoaded', function() {
 	const inputMethodElements = document.getElementsByName('inputMethod');
 	inputMethodElements.forEach(function(element) {
 		element.addEventListener('change', function(){
-			switch(element.value){
+			if(!document.querySelector('input[name="inputMethod"]:checked'))return;
+			let value = document.querySelector('input[name="inputMethod"]:checked').value;
+			switch(value){
 				case 'file':
 					document.getElementById('selectFileButton').disabled = false;
 					document.getElementById('inputDirectorySelectButton').disabled = true;
@@ -120,7 +124,38 @@ document.addEventListener('DOMContentLoaded', function() {
 		// csvProcessor.processAll();
 		csvProcessor.processAllStream();
 	});
+
+	// プロファイル系
+	csvProcessor.listLocalProfiles();
+	// プロファイルエクスポート
+	const exportProfileButton = document.getElementById('profileExportButton');
+	exportProfileButton.addEventListener('click', async function(){
+		csvProcessor.exportProfile();
+	});
+
+	// プロファイルインポート
+	const importProfileButton = document.getElementById('profileImportButton');
+	importProfileButton.addEventListener('click', async function(){
+		csvProcessor.importProfile();
+	});
 	
+	// プロファイル保存
+	const saveProfileButton = document.getElementById('profileSaveButton');
+	saveProfileButton.addEventListener('click', async function(){
+		csvProcessor.saveProfile();
+	});
+
+	// プロファイル読込
+	const loadProfileButton = document.getElementById('profileLoadButton');
+	loadProfileButton.addEventListener('click', async function(){
+		csvProcessor.loadProfile();
+	});
+
+	// プロファイル削除
+	const removeProfileButton = document.getElementById('profileRemoveButton');
+	removeProfileButton.addEventListener('click', async function(){
+		csvProcessor.removeProfile();
+	});
 
 
 
@@ -132,6 +167,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 const csvProcessor = {
+	version: 1,
+
+	inputFiles: {},
+	outputFiles: {},
 
 	settings:{
 		outputBufferSize : 20_000_000, // 20M
@@ -263,7 +302,6 @@ const csvProcessor = {
 				csvProcessor.options.outputLineBreak = '\n';
 				break;
 		}
-		// csvProcessor.outputFilesWriteableStream = []; ★
 		
 		// ユーザー関数の準備
 		// 入力ファイルごとに実行する処理
@@ -558,6 +596,8 @@ const csvProcessor = {
 		const options = csvProcessor.getOptionsFromHtml();
 		csvProcessor.options = options;
 		csvProcessor.headerText = null;
+		csvProcessor.sessionMemory = {};
+		csvProcessor.inputRowCount = 0;
 
 		if(!csvProcessor.outputDirectoryHandle){
 			csvProcessor.dialog("出力ディレクトリが選択されていません。");
@@ -684,11 +724,23 @@ const csvProcessor = {
 			let streamIndex = -1;
 			let loadedSize = 0;
 			let loadedRowNumber = 0;
+
 			while (true) {
 				console.log("chunk load start Index:",streamIndex);
-				let { done, value } = await reader.read();
+				let done,value;
+				if(!csvProcessor.options.inputLoadOnce){//通常のチャンク読み込み
+					let tmp = await reader.read();
+					done = tmp.done;
+					value = tmp.value;
+				}else{// 強制一括読み込み
+					if(streamIndex == -1){
+						value = new Uint8Array(await csvFile.fileObj.arrayBuffer());
+						done = false;
+					}else{
+						done = true;
+					}
+				}
 				streamIndex++;
-								// console.log(done,value);
 				if (value) {
 					loadedSize += value.length;
 				}else{
@@ -745,7 +797,7 @@ const csvProcessor = {
 				csvTextToArrayResult=undefined
 				// continue;
 
-								// csvごとに行う処理
+				// csvごとに行う処理
 				// ユーザー処理
 				if(csvProcessor.perInputFuncFlag){
 					try{
@@ -760,8 +812,9 @@ const csvProcessor = {
 							allLoaded,
 							completed,
 							firstLoad,
-							csvProcessor //★メモリリークするなら入れない
-						});
+							csvProcessor, //★メモリリークするなら入れない
+							sessionRowCount : csvProcessor.inputRowCount,
+						},csvProcessor.sessionMemory);
 						if (Array.isArray(tmp)) {
 							csvArray = tmp;
 						}
@@ -788,7 +841,7 @@ const csvProcessor = {
 					// ユーザー処理
 					if(csvProcessor.perRowFuncFlag){
 						try{
-							let tmp = csvProcessor.perRowFunc({
+							let tmp = csvProcessor.perRowFunc({// a(argments)
 								file: csvFile,
 								fileObj: csvFile.fileObj,
 								csvIndex,
@@ -800,11 +853,12 @@ const csvProcessor = {
 								completed,
 								firstLoad,
 								csvProcessor, //★メモリリークするなら入れない
+								sessionRowCount : csvProcessor.inputRowCount,
 
 								rowIndex: loadedRowNumber+rowIndex,
 								rowArray,
 								rowText,
-							});
+							},csvProcessor.sessionMemory);
 							if (Array.isArray(tmp)) {
 								csvArray[rowIndex] = tmp;
 								rowArray = tmp;
@@ -819,7 +873,7 @@ const csvProcessor = {
 						// ユーザー処理
 						if(csvProcessor.perCellFuncFlag){
 							try{
-								let tmp = csvProcessor.perCellFunc({
+								let tmp = csvProcessor.perCellFunc({ // a(argments)
 									file: csvFile,
 									fileObj: csvFile.fileObj,
 									csvIndex,
@@ -831,6 +885,7 @@ const csvProcessor = {
 									completed,
 									firstLoad,
 									csvProcessor, //★メモリリークするなら入れない
+									sessionRowCount : csvProcessor.inputRowCount,
 
 									rowIndex: loadedRowNumber+rowIndex,
 									rowArray,
@@ -838,7 +893,7 @@ const csvProcessor = {
 									
 									cellIndex,
 									cellText,
-								});
+								},csvProcessor.sessionMemory);
 								// 戻り値が文字列であれば、cellDataを上書き
 								switch(typeof tmp){
 									case 'string':
@@ -879,8 +934,9 @@ const csvProcessor = {
 									rowArray,
 									rowText,
 									options,
-									// csvProcessor
-								});
+									csvProcessor,
+									sessionRowCount : csvProcessor.inputRowCount,
+								},csvProcessor.sessionMemory);
 								if (typeof tmp === 'string') {
 									outputFileNames = [tmp];
 								} else if (Array.isArray(tmp)) {
@@ -898,6 +954,7 @@ const csvProcessor = {
 						}
 						rowArray = undefined;
 					}// if
+					csvProcessor.inputRowCount++;
 				} // 行ごと
 				
 				loadedRowNumber += csvArray.length;
@@ -906,6 +963,9 @@ const csvProcessor = {
 				rowTextArray = undefined;
 
 			}
+
+
+
 		} catch (error) {
 			console.error('Error reading stream:', error);
 		} finally {
@@ -924,10 +984,12 @@ const csvProcessor = {
 		let tmpOutputText = ""; //今すぐ書き出すテキスト
 
 		// 出力ファイルがなければ開く
-		if(!csvProcessor.outputFilesWriteableStream){
-			csvProcessor.outputFilesWriteableStream = [];
+		if(!csvProcessor.outputFiles[outputFileFullName]){
+			csvProcessor.outputFiles[outputFileFullName] = {}
+			csvProcessor.outputFiles[outputFileFullName].outputRowCount = 0;
 		}
-		if(!csvProcessor.outputFilesWriteableStream[outputFileFullName]){
+
+		if(!csvProcessor.outputFiles[outputFileFullName].writeableStream){
 			// なければ作成
 			console.log("File creating",outputFileFullName);
 			csvProcessor.addLogText("output",`ファイル作成中: ${outputFileFullName}`);
@@ -935,7 +997,7 @@ const csvProcessor = {
 			writeableStream = await fileHandle.createWritable();
 			console.log("File created",outputFileFullName);
 			csvProcessor.addLogText("output",`ファイル作成完了: ${outputFileFullName}`);
-			csvProcessor.outputFilesWriteableStream[outputFileFullName] = writeableStream;
+			csvProcessor.outputFiles[outputFileFullName].writeableStream = writeableStream;
 			
 			// prefixを書き込み
 			if(csvProcessor.options.outputPrefixText!=""){
@@ -950,7 +1012,7 @@ const csvProcessor = {
 			await writeableStream.write(arraybuffer);
 			
 		}else{
-			writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
+			writeableStream = csvProcessor.outputFiles[outputFileFullName].writeableStream;
 		}
 
 		return writeableStream;
@@ -963,38 +1025,37 @@ const csvProcessor = {
 		const writeableStream = await csvProcessor.getWriteableStream(outputFileFullName);
 		// 出力ファイルに書き込み
 		if( 
-			(csvProcessor.options.outputWritingTiming == "100" && csvProcessor.outputFilesBuffer[outputFileFullName].length > 100) ||
-			(csvProcessor.options.outputWritingTiming == "1000" && csvProcessor.outputFilesBuffer[outputFileFullName].length > 1000) ||
-			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFilesBuffer[outputFileFullName].length > 10000)
+			(csvProcessor.options.outputWritingTiming == "100" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 100) ||
+			(csvProcessor.options.outputWritingTiming == "1000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 1000) ||
+			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 10000)
 		){
 			await csvProcessor.writeToFile(outputFileFullName);
 		}
 	},
 
 	writeToBuffer: async (outputFileFullName, rowArray)=>{
-		if(!csvProcessor.outputFilesBuffer) csvProcessor.outputFilesBuffer = [];
-		if(!csvProcessor.outputFilesBuffer[outputFileFullName]){
-			csvProcessor.outputFilesBuffer[outputFileFullName] = [];
+		if(!csvProcessor.outputFiles) csvProcessor.outputFiles = {};
+		if(!csvProcessor.outputFiles[outputFileFullName]){
+			csvProcessor.outputFiles[outputFileFullName] = {};
 		}
-		csvProcessor.outputFilesBuffer[outputFileFullName].push(rowArray);
+		if(!csvProcessor.outputFiles[outputFileFullName].outputBuffer){
+			csvProcessor.outputFiles[outputFileFullName].outputBuffer = [];
+		}
+		csvProcessor.outputFiles[outputFileFullName].outputBuffer.push(rowArray);
+		csvProcessor.outputFiles[outputFileFullName].outputRowCount++;
 	},
 
 	writeToAllFile: async ()=>{
-		if(!csvProcessor.outputFilesBuffer || Object.keys(csvProcessor.outputFilesBuffer).length == 0){
-			return;
-		}
-		for(const [outputFileFullName,writeableStream] of Object.entries(csvProcessor.outputFilesBuffer)){
+		for(const [outputFileFullName,outputFile] of Object.entries(csvProcessor.outputFiles)){
 			await csvProcessor.writeToFile(outputFileFullName);
 		}
 	},
 
 	writeToFile: async (outputFileFullName) => {
-		if(!csvProcessor.outputFilesBuffer || !csvProcessor.outputFilesBuffer[outputFileFullName]){
-			return;
-		}
-		const writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
+
+		const writeableStream = csvProcessor.outputFiles[outputFileFullName].writeableStream;
 		const options = csvProcessor.options;
-		let rowArrays = csvProcessor.outputFilesBuffer[outputFileFullName];
+		let rowArrays = csvProcessor.outputFiles[outputFileFullName].outputBuffer;
 
 		// 出力ファイルごとに実行するコードの実行
 		if(csvProcessor.perOutputFuncFlag){
@@ -1016,7 +1077,7 @@ const csvProcessor = {
 
 		// 出力テキストを作る
 		let outputText = "";
-		for(let i = 0; i < csvProcessor.outputFilesBuffer[outputFileFullName].length; i++){
+		for(let i = 0; i < csvProcessor.outputFiles[outputFileFullName].outputBuffer.length; i++){
 			const rowArray = rowArrays[i];
 			outputText += csvProcessor.rowArrayToCsvText(rowArray,{
 				delimiter: options.outputDelimiter || ',',
@@ -1028,11 +1089,11 @@ const csvProcessor = {
 				isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
 				// addLastLineBreak: options.outputAddLastLineBreak || false,
 			});
-			if(i != csvProcessor.outputFilesBuffer[outputFileFullName].length-1 || csvProcessor.options.outputAddLastLineBreak){
+			if(i != csvProcessor.outputFiles[outputFileFullName].outputBuffer.length-1 || csvProcessor.options.outputAddLastLineBreak){
 				outputText += csvProcessor.options.outputLineBreak;
 			}
 		}
-		csvProcessor.outputFilesBuffer[outputFileFullName] = [];
+		csvProcessor.outputFiles[outputFileFullName].outputBuffer = [];
 		
 		const arraybuffer = csvProcessor.encodeText(outputText,csvProcessor.options.outputEncoding);
 		await writeableStream.write(arraybuffer);
@@ -1041,20 +1102,20 @@ const csvProcessor = {
 	},
 
 	closeAllOutputStream: async()=>{
-		if(!csvProcessor.outputFilesWriteableStream || Object.keys(csvProcessor.outputFilesWriteableStream).length == 0){
+		if(!csvProcessor.outputFiles || Object.keys(csvProcessor.outputFiles).length == 0){
 			csvProcessor.dialog("出力ファイルが作成されませんでした。");
 			return;
 		}
-		for(const [outputFileFullName,writeableStream] of Object.entries(csvProcessor.outputFilesWriteableStream)){
+		for(const [outputFileFullName,outputFile] of Object.entries(csvProcessor.outputFiles)){
 			await csvProcessor.closeOutputStream(outputFileFullName);
 		}
 	},
 
 	closeOutputStream: async (outputFileFullName) => {
-		if(!csvProcessor.outputFilesWriteableStream || !csvProcessor.outputFilesWriteableStream[outputFileFullName]){
+		if(!csvProcessor.outputFiles[outputFileFullName].writeableStream){
 			return;
 		}
-		const writeableStream = csvProcessor.outputFilesWriteableStream[outputFileFullName];
+		const writeableStream = csvProcessor.outputFiles[outputFileFullName].writeableStream;
 		
 		// バッファに残っているものを書き込む
 		await csvProcessor.writeToFile(outputFileFullName);
@@ -1078,7 +1139,8 @@ const csvProcessor = {
 		csvProcessor.addLogText("output",`ファイルをクローズ: ${outputFileFullName}`);
 
 		// ストリーム削除
-		delete csvProcessor.outputFilesWriteableStream[outputFileFullName];
+		delete csvProcessor.outputFiles[outputFileFullName].writeableStream;
+		delete csvProcessor.outputFiles[outputFileFullName];
 	},
 
 
@@ -1154,6 +1216,11 @@ const csvProcessor = {
 				case 'checkbox':
 					options[key] = element.checked;
 					break;
+				case 'radio':
+					if(element.checked){
+						options[key] = element.value;
+					}
+					break;
 				case 'number':
 					options[key] = Number(value);
 					break;
@@ -1178,6 +1245,13 @@ const csvProcessor = {
 			switch(element.type){
 				case 'checkbox':
 					element.checked = value;
+					break;
+				case 'radio':
+					if(element.value == value){
+						element.checked = true;
+					}else{
+						element.checked = false;
+					}
 					break;
 				case 'number':
 					element.value = value;
@@ -1247,19 +1321,42 @@ const csvProcessor = {
 
 		// 改行をLFに統一
 		let tmpArray = [];
-		for( let i = 0; i < csvTextArray.length; i++){
-			if(csvTextArray[i] == '\r' && csvTextArray[i+1] == '\n'){
-				// CRLFはLFに変換
-				tmpArray.push('\n');
-				i++;
-			}else if(csvTextArray[i] == '\r'){
-				// CRはLFに変換
-				tmpArray.push('\n');
-			}else{
-				tmpArray.push(csvTextArray[i]);
+		if(options.lineBreakSelect == "ALL"){
+			for( let i = 0; i < csvTextArray.length; i++){
+				if(csvTextArray[i] == '\r' && csvTextArray[i+1] == '\n'){
+					// CRLFはLFに変換
+					tmpArray.push('\n');
+					i++;
+				}else if(csvTextArray[i] == '\r'){
+					// CRはLFに変換
+					tmpArray.push('\n');
+				}else{
+					tmpArray.push(csvTextArray[i]);
+				}
 			}
+			csvTextArray = tmpArray;
+		}else if(options.lineBreakSelect == "CR"){
+			for( let i = 0; i < csvTextArray.length; i++){
+				if(csvTextArray[i] == '\r'){
+					// CRはLFに変換
+					tmpArray.push('\n');
+				}else{
+					tmpArray.push(csvTextArray[i]);
+				}
+			}
+			csvTextArray = tmpArray;
+		}else if(options.lineBreakSelect == "CRLF"){
+			for( let i = 0; i < csvTextArray.length; i++){
+				if(csvTextArray[i] == '\r' && csvTextArray[i+1] == '\n'){
+					// CRLFはLFに変換
+					tmpArray.push('\n');
+					i++;
+				}else{
+					tmpArray.push(csvTextArray[i]);
+				}
+			}
+			csvTextArray = tmpArray;
 		}
-		csvTextArray = tmpArray;
 
 
 		//入力末尾の改行を消す
@@ -1404,7 +1501,8 @@ const csvProcessor = {
 									}
 									afterWrapperCharacter = false;
 									break;
-								case lineBreakMatch:
+								// case lineBreakMatch:
+								case "\n":
 									if(afterWrapperCharacter){
 										inWrapper = false;
 									}else{
@@ -1434,7 +1532,8 @@ const csvProcessor = {
 									cell = "";
 									afterDelimiter = true;
 									break;
-								case lineBreakMatch:
+								// case lineBreakMatch:
+								case "\n":
 									if(!afterLineBreak || !options.skipEmptyRow){ // 連続する改行は無視
 										// 改行が出てきたらセルを追加して行を追加
 										row.push(cell);
@@ -1453,7 +1552,8 @@ const csvProcessor = {
 							if(char != options.delimiter){
 								afterDelimiter = false
 							};
-							if(char != lineBreakMatch){
+							// if(char != lineBreakMatch){
+							if(char != "\n"){
 								afterLineBreak = false
 							};
 							afterWrapperCharacter = false;
@@ -1540,6 +1640,114 @@ const csvProcessor = {
 		return rowArray.join(options.delimiter);
 	},
 
+	// プロファイル操作
+	exportProfile: ()=>{
+		// プロファイルをエクスポート
+		let profile = {
+			title:"CSV Processor Profile",
+			version: csvProcessor.version,
+			options: csvProcessor.getOptionsFromHtml(),
+		};
+		let profileText = JSON.stringify(profile);
+		let blob = new Blob([profileText], {type: 'application/json'});
+		let url = URL.createObjectURL(blob);
+		let a = document.createElement('a');
+		const profileName = prompt("プロファイルの名前を入力してください:", "profile.json");
+		if (profileName) {
+			a.download = profileName;
+			a.href = url;
+			a.click();
+		}
+	},
+
+	importProfile: async ()=>{
+				// プロファイルをインポート
+		let input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json';
+		input.onchange = async function(event) {
+			let file = event.target.files[0];
+			let reader = new FileReader();
+			reader.onload = async function(event) {
+				let profileText = event.target.result;
+				let profile = JSON.parse(profileText);
+				csvProcessor.setOptionsToHtml(profile.options);
+			};
+			reader.readAsText(file);
+		};
+		input.click();
+	},
+	
+	saveProfile: ()=>{
+		// localStorageにプロファイルを保存
+		let profile = {
+			title:"CSV Processor Profile",
+			version: csvProcessor.version,
+			options: csvProcessor.getOptionsFromHtml(),
+		};
+		// localStorage対応チェック
+		if (typeof localStorage === 'undefined') {
+			alert('このブラウザはlocalStorageに対応していません。');
+			return;
+		}
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+
+		// 名前を入力
+		const profileName = prompt("プロファイルの名前を入力してください:", "profile");
+		if (profileName) {
+			currentProfiles[profileName] = profile;
+			localStorage.setItem('csvProcessorProfiles', JSON.stringify(currentProfiles));
+		}
+
+		csvProcessor.listLocalProfiles();
+	},
+
+	listLocalProfiles: ()=>{
+		// localStorageに保存されたプロファイルをリスト表示
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+		let profileList = document.getElementById('profileSelect');
+		profileList.innerHTML = '';
+		for(const [profileName,profile] of Object.entries(currentProfiles)){
+			let option = document.createElement('option');
+			option.value = profileName;
+			option.textContent = profileName;
+			profileList.appendChild(option);
+		}
+	},
+
+	loadProfile: ()=>{
+		// 読込確認
+		if(!confirm("現在の設定を上書きします。よろしいですか？"))return;
+
+		// localStorageからプロファイルを読み込み
+		let profileList = document.getElementById('profileSelect');
+		let profileName = profileList.value;
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+		let profile = currentProfiles[profileName];
+		if(profile){
+			csvProcessor.setOptionsToHtml(profile.options);
+		}
+	},
+
+	removeProfile: ()=>{
+		// 削除確認
+		if(!confirm("本当に削除しますか？"))return;
+
+		// localStorageからプロファイルを削除
+		let profileList = document.getElementById('profileSelect');
+		let profileName = profileList.value;
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+		delete currentProfiles[profileName];
+		localStorage.setItem('csvProcessorProfiles', JSON.stringify(currentProfiles));
+		csvProcessor.listLocalProfiles();
+	},
+
+
+	//汎用品
 	dialog: (message)=>{
 		alert(message);
 	},

@@ -56,6 +56,33 @@ label:hover{
   background-color: #EEE;
 }
 
+.tooltip{
+  display: inline-block;
+  cursor: help;
+  margin: 1px;
+  height: 1.5em;
+  width: 1.5em;
+  text-align: center;
+  line-height: 1.5em;
+  border-radius: 0.3em;
+  background-color: #CCF;
+  border: 1px solid #000;
+}
+
+.tooltipText{
+  display: none;
+  position: absolute;
+  text-align: left;
+  background-color: #FFF;
+  border: 1px solid #000;
+  padding: 5px;
+  z-index: 100;
+}
+
+.tooltip:hover .tooltipText{
+  display: block;
+}
+
 /* Header */
 #header{
   height: 40px;
@@ -209,7 +236,7 @@ label:hover{
   border: 1px solid #555;
 }
 #inputOptionTable th, #inputOptionTable td{
-  text-align-last: left;
+  text-align: left;
   border: 1px solid #555;
   padding: 2px 5px;
 }
@@ -220,7 +247,7 @@ label:hover{
   border: 1px solid #555;
 }
 #outputOptionTable th, #outputOptionTable td{
-  text-align-last: left;
+  text-align: left;
   border: 1px solid #555;
   padding: 2px 5px;
 }
