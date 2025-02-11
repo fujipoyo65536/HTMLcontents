@@ -24,6 +24,39 @@
 // DOM読み込み後のイベント設定
 document.addEventListener('DOMContentLoaded', function() {
 
+	// タブ関係
+	const previewPaneTabs = document.querySelectorAll('#previewPaneTabBox>.tab');
+	const previewPaneContents = document.querySelectorAll('#previewPaneContentBox>.tabContent');
+	previewPaneTabs.forEach(function(tab,tabIndex){
+		tab.addEventListener('click',function(){
+			previewPaneTabs.forEach(function(tab){
+				tab.classList.remove('active');
+			});
+			previewPaneContents.forEach(function(content){
+				content.classList.remove('active');
+			});
+			tab.classList.add('active');
+			previewPaneContents[tabIndex].classList.add('active');
+		});
+	});
+	previewPaneTabs[0].click();
+
+	const codePaneTabs = document.querySelectorAll('#codePaneTabBox>.tab');
+	const codePaneContents = document.querySelectorAll('#codePaneContentBox>.tabContent');
+	codePaneTabs.forEach(function(tab,tabIndex){
+		tab.addEventListener('click',function(){
+			codePaneTabs.forEach(function(tab){
+				tab.classList.remove('active');
+			});
+			codePaneContents.forEach(function(content){
+				content.classList.remove('active');
+			});
+			tab.classList.add('active');
+			codePaneContents[tabIndex].classList.add('active');
+		});
+	});
+	codePaneTabs[0].click();
+
 	// すべてのinput,textarea,selectに変更があったときの処理
 	const inputElements = document.querySelectorAll('input,textarea,select');
 	inputElements.forEach(function(element) {
