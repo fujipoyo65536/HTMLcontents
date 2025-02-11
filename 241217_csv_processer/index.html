@@ -4,6 +4,12 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>CSV Processor</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+
+
+
 	<link rel="stylesheet" href="csvProcessor.css">
 	<script src="encoding.js-master/encoding.min.js"></script>
 	<script src="csvProcessor.js"></script>
@@ -337,35 +343,39 @@
 			<div id="codePane">
 				<div id="codePaneTabBox" class="tabBox">
 					<div class="paneTitle">Code</div>
-					<div class="tab" data-tab="perInputProcess">入力ファイルごとの処理</div>
+					<div class="tab" data-tab="perInputProcess">読込ごとの処理</div>
 					<div class="tab" data-tab="perRowProcess">行ごとの処理</div>
 					<div class="tab" data-tab="perCellProcess">セルごとの処理</div>
-					<div class="tab" data-tab="perOutputProcess">出力ファイルごとの処理</div>
+					<div class="tab" data-tab="perOutputProcess">書込ごとの処理</div>
 					<div class="paneTitle">Process</div>
 					<div class="tab" data-tab="processingStatus">処理状況</div>
 				</div>
 				<div id="codePaneContentBox" class="contentBox">
 					<div id="perInputProcessTab" class="tabContent">
-						<p>
-							ここで使える変数
-							<table>
-								<tr><th>file</th><td></td></tr>
-								<tr><th>fileObj</th><td>Fileオブジェクト</td></tr>
-								<tr><th>csvIndex</th><td>入力ファイルのインデックス(何番目か)</td></tr>
-								<tr><th>csvText</th><td>入力ファイルのテキスト</td></tr>
-								<tr><th>csvArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト(セルごと)</td></tr>
-								<tr><th>rowTextArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト(行ごと)</td></tr>
-								<tr><th>options</th><td>現在の各設定値</td></tr>
-								<tr><th>allLoaded</th><td>1チャンクで全てのデータが読み込まれた</td></tr>
-								<tr><th>completed</th><td>ファイル読み込み完了(これが最後のチャンク)</td></tr>
-								<tr><th>firstLoad</th><td>最初の読み込み(これが最初のチャンク)</td></tr>
-								<tr><th>sessionRowCount</th><td>セッション内の累計読込行数(最初の行は0)</td></tr>
-							</table>
-							配列を返すことで、csvArrayを書き換えることが可能
-						</p>
-						<div id="perInputProcesses">
-							<div class="perInputProcess" data-perInputProcessNum="0" data-perInputProcessType="perInputCode">
-								<textarea class="code" data-processOption="perInputCode" data-option="perInputCode"></textarea>
+						<div>
+							<div class="subPane">
+								<div class="codeMirrorBox">
+									<textarea class="code" data-processOption="perInputCode" data-option="perInputCode"
+										id="perInputCode">//example</textarea>
+								</div>
+								<p>配列を返すことで、入力データ(a.csvArray)を書き換え、以後の処理結果を変えることが可能</p>
+							</div>
+							<div class="subPane">
+								<div class="paneTitle">ここで使える変数</div>
+								<table>
+									<tr><th>file</th><td></td></tr>
+									<tr><th>fileObj</th><td>Fileオブジェクト</td></tr>
+									<tr><th>csvIndex</th><td>入力ファイルのインデックス(何番目か)</td></tr>
+									<tr><th>csvText</th><td>入力ファイルのテキスト</td></tr>
+									<tr><th>csvArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト</td></tr>
+									<tr><th>rowTextArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト
+									</tr>
+									<tr><th>options</th><td>現在の各設定値</td></tr>
+									<tr><th>allLoaded</th><td>1チャンクで全てのデータが読み込まれた</td></tr>
+									<tr><th>completed</th><td>ファイル読み込み完了(これが最後のチャンク)</td></tr>
+									<tr><th>firstLoad</th><td>最初の読み込み(これが最初のチャンク)</td></tr>
+									<tr><th>sessionRowCount</th><td>セッション内の累計読込行数(最初の行は0)</td></tr>
+								</table>
 							</div>
 						</div>
 					</div>
