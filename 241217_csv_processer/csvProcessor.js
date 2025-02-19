@@ -1,9 +1,11 @@
 'use strict';
 
 // ●現状の問題
+// BOMをうまく扱えない
 // 複雑なCSVが読めなくなっている気がする
 // プレビュー周りの実装が全体的によくない。文字コードを選択するとエラーになる。
 // 文字コード自動判定も動いているのか怪しい
+// 各テキスト欄が長いとレイアウトが崩れる
 
 // ●todo
 // カスタム改行文字に対応
@@ -26,29 +28,73 @@
 document.addEventListener('DOMContentLoaded', function() {
 	
 	// codemirror
-	csvProcessor.editors = {};
-	let editor = CodeMirror.fromTextArea(document.getElementById('inputCsvTextInput'), {
-		lineNumbers: true,
-		mode: "javascript",
-		theme: "default",
-		lineWrapping: true,
-		showCursorWhenSelecting: true,
-		lineWiseCopyCut: true,
-		pasteLinesPerSelection: true,
-	});
-	editor.setValue('列A,列B,列C\n1,2,3\n4,5,6,一列多い例\n7,8,9次行は空行\n\n"セル内に→""←セミコロン","セル内に→\n←改行","セル内に→,←カンマ"\n10,一列少ない例\n11,12,末尾に改行\n')
-	// editor.setValue("// Input Code Here;\n")
+	{
+		csvProcessor.editors = {};
+		csvProcessor.editors.inputText = CodeMirror.fromTextArea(document.getElementById('inputCsvTextInput'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			pasteLinesPerSelection: true,
+		});
+		csvProcessor.editors.inputText.setValue('列A,列B,列C\n1,2,3\n4,5,6,一列多い例\n7,8,9次行は空行\n\n"セル内に→""←セミコロン","セル内に→\n←改行","セル内に→,←カンマ"\n10,一列少ない例\n11,12,末尾に改行\n')
+		// editor.setValue("// Input Code Here;\n")
 
-	csvProcessor.editors.perInputCode = CodeMirror.fromTextArea(document.getElementById('perInputCode'), {
-		lineNumbers: true,
-		mode: "javascript",
-		theme: "default",
-		lineWrapping: true,
-		showCursorWhenSelecting: true,
-		lineWiseCopyCut: true,
-		pasteLinesPerSelection: true,
-	});
-	csvProcessor.editors.perInputCode.setValue('//example\n//return [];\n');
+		csvProcessor.editors.outputText = CodeMirror.fromTextArea(document.getElementById('csvTextOutputTextarea'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			pasteLinesPerSelection: true,
+		});
+
+		csvProcessor.editors.perInputCode = CodeMirror.fromTextArea(document.getElementById('perInputCode'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			lineWiseCopyCut: true,
+			pasteLinesPerSelection: true,
+		});
+		csvProcessor.editors.perInputCode.setValue('//example\n//return [];\n');
+
+		csvProcessor.editors.perRowCode = CodeMirror.fromTextArea(document.getElementById('perRowCode'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			lineWiseCopyCut: true,
+			pasteLinesPerSelection: true,
+		});
+		csvProcessor.editors.perRowCode.setValue('//example\n//return [];\n');
+
+		csvProcessor.editors.perCellCode = CodeMirror.fromTextArea(document.getElementById('perCellCode'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			lineWiseCopyCut: true,
+			pasteLinesPerSelection: true,
+		});
+		csvProcessor.editors.perCellCode.setValue('//example\n//return cellText;\n');
+
+		csvProcessor.editors.perOutputCode = CodeMirror.fromTextArea(document.getElementById('perOutputCode'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			lineWiseCopyCut: true,
+			pasteLinesPerSelection: true,
+		});
+		csvProcessor.editors.perOutputCode.setValue('//example\n//return [];\n');
+	}
+
 	
 	// タブ関係
 	const previewPaneTabs = document.querySelectorAll('#previewPaneTabBox>.tab');
@@ -274,7 +320,7 @@ const csvProcessor = {
 		
 		const csvTextToArrayResult = csvProcessor.csvTextToArray(inputText,{
 			delimiter: options.inputDelimiter || ',',
-			lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
+			lineBreakSelect: options.inputLineBreakSelect=="CUSTOM"?options.inputLineBreakCustom:options.inputLineBreakSelect,
 			skipRowNumber: options.inputSkipRowNumber || 0,
 			skipEmptyRow: options.inputSkipEmptyRow || false,
 			ignoreLastLineBreak: options.inputIgnoreLastLineBreak || false,
@@ -468,7 +514,7 @@ const csvProcessor = {
 			csvProcessor.inputFileTextObj = csvTextArray;
 			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvTextArray,{
 				delimiter: options.inputDelimiter || ',',
-				lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
+				lineBreakSelect: options.inputLineBreakSelect=="CUSTOM"?options.inputLineBreakCustom:options.inputLineBreakSelect,
 				skipRowNumber: options.inputSkipRowNumber || 0,
 				skipEmptyRow: options.inputSkipEmptyRow || false,
 				ignoreLastLineBreak: options.inputIgnoreLastLineBreak || false,
@@ -657,6 +703,7 @@ const csvProcessor = {
 		csvProcessor.headerText = null;
 		csvProcessor.sessionMemory = {};
 		csvProcessor.inputRowCount = 0;
+		csvProcessor.headerArray = undefined;
 		
 		if(!csvProcessor.outputDirectoryHandle){
 			csvProcessor.dialog("出力ディレクトリが選択されていません。");
@@ -667,17 +714,20 @@ const csvProcessor = {
 		// lineBreakの設定
 		switch(options.outputLineBreakSelect){
 			case 'LF':
-			csvProcessor.options.outputLineBreak = '\n';
-			break;
+				csvProcessor.options.outputLineBreak = '\n';
+				break;
 			case 'CR':
-			csvProcessor.options.outputLineBreak = '\r';
-			break;
+				csvProcessor.options.outputLineBreak = '\r';
+				break;
 			case 'CRLF':
-			csvProcessor.options.outputLineBreak = '\r\n';
-			break;
+				csvProcessor.options.outputLineBreak = '\r\n';
+				break;
+			case "CUSTOM":
+				csvProcessor.options.outputLineBreak = options.outputLineBreakCustom || '\n';
+				break
 			default:
-			csvProcessor.options.outputLineBreak = '\n';
-			break;
+				csvProcessor.options.outputLineBreak = '\n';
+				break;
 		}
 		
 		
@@ -685,7 +735,7 @@ const csvProcessor = {
 		{
 			// 入力ファイルごとに実行する処理
 			
-			let perInputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perInputCode']").value);
+			let perInputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perInputCode.getValue());
 			if(typeof perInputFunc === 'function'){
 				csvProcessor.perInputFunc = perInputFunc;
 				csvProcessor.perInputFuncFlag = true;
@@ -696,7 +746,7 @@ const csvProcessor = {
 			}
 			
 			// 行ごとに実行する処理
-			let perRowFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perRowCode']").value);
+			let perRowFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perRowCode.getValue());
 			if(typeof perRowFunc === 'function'){
 				csvProcessor.perRowFunc = perRowFunc;
 				csvProcessor.perRowFuncFlag = true;
@@ -707,7 +757,7 @@ const csvProcessor = {
 			}
 			
 			// セルごとに実行する処理
-			let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perCellCode']").value);
+			let perCellFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perCellCode.getValue());
 			if(typeof perCellFunc === 'function'){
 				csvProcessor.perCellFunc = perCellFunc;
 				csvProcessor.perCellFuncFlag = true;
@@ -718,7 +768,7 @@ const csvProcessor = {
 			}
 			
 			// 出力ファイルごとに実行する処理
-			let perOutputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perOutputCode']").value);
+			let perOutputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perOutputCode.getValue());
 			if(typeof perOutputFunc === 'function'){
 				csvProcessor.perOutputFunc = perOutputFunc;
 				csvProcessor.perOutputFuncFlag = true;
@@ -831,7 +881,7 @@ const csvProcessor = {
 				
 				let csvTextToArrayResult = csvProcessor.csvTextToArray(csvBuffer,{
 					delimiter: options.inputDelimiter || ',',
-					lineBreakSelect: options.inputLineBreakSelect || 'ALL', // ALL,LF,CR,CRLF
+					lineBreakSelect: options.inputLineBreakSelect=="CUSTOM"?options.inputLineBreakCustom:options.inputLineBreakSelect,
 					skipRowNumber: options.inputSkipRowNumber || 0,
 					skipEmptyRow: options.inputSkipEmptyRow || false,
 					ignoreLastLineBreak: options.inputIgnoreLastLineBreak || false,
@@ -975,10 +1025,10 @@ const csvProcessor = {
 					
 					// 出力
 					if(rowIndex+loadedRowNumber == 0){
-						if(!csvProcessor.headerArray){
+						// if(!csvProcessor.headerArray){
 							// ヘッダー行は、記憶して終わり(書き出さない)
 							csvProcessor.headerArray = JSON.parse(JSON.stringify(rowArray));
-						}
+						// }
 					}else{
 						let outputFileNames = ["output.csv"];
 						if(csvProcessor.outputFileNameFuncFlag){
@@ -1328,7 +1378,7 @@ const csvProcessor = {
 	
 	csvTextToArray: (csvTextInput,options={
 		delimiter:',',
-		lineBreakSelect:'ALL', // ALL,LF,CR,CRLF
+		lineBreakSelect:'ALL', // ALL,LF,CR,CRLF,文字列
 		skipRowNumber:0,
 		skipEmptyRow:false, 
 		ignoreLastLineBreak:false,
@@ -1357,25 +1407,29 @@ const csvProcessor = {
 		let lineBreak;
 		switch(options.lineBreakSelect){
 			case 'ALL':
-			lineBreakRegExp = /[\r\n|\r|\n]/;
-			lineBreak = '\r\n';
-			break;
+				lineBreakRegExp = /[\r\n|\r|\n]/;
+				lineBreak = '\r\n';
+				break;
 			case 'LF':
-			lineBreakRegExp = /\n/;
-			lineBreak = '\n';
-			break;
+				lineBreakRegExp = /\n/;
+				lineBreak = '\n';
+				break;
 			case 'CR':
-			lineBreakRegExp = /\r/;
-			lineBreak = '\r';
-			break;
+				lineBreakRegExp = /\r/;
+				lineBreak = '\r';
+				break;
 			case 'CRLF':
-			lineBreakRegExp = /\r\n/;
-			lineBreak = '\r\n';
-			break;
+				lineBreakRegExp = /\r\n/;
+				lineBreak = '\r\n';
+				break;
+			case 'CUSTOM':
+				lineBreakRegExp = new RegExp(options.lineBreakSelect);
+				lineBreak = options.lineBreakSelect;
+				break;
 			default:
-			lineBreakRegExp = /\n/;
-			lineBreak = '\n';
-			break;
+				lineBreakRegExp = /\n/;
+				lineBreak = '\n';
+				break;
 		}
 		
 		// 改行をLFに統一
@@ -1623,7 +1677,12 @@ const csvProcessor = {
 				row.push(cell);
 				// arrayObj.push(row);
 				// rowTextObj.push(rowText);
-				restArray = (row.join('')).split("")
+
+				if(options.last){
+					arrayObj.push(row);
+				}else{
+					restArray = (row.join('')).split("")
+				}
 			}
 			break;
 		}//switch
@@ -1674,329 +1733,331 @@ const csvProcessor = {
 			}
 			
 			return result;
-		},
+	},
+	
+	rowArrayToCsvText: (rowArray,options={
+		delimiter:',',
+		// lineBreak:'\n',
+		// isUsingHeader:false,
+		wrapper:'"',
+		isUsingWrapper:false,
+		isUsingWrapperAll:false,
+		isUsingSpecialCharacterInWrapper:false,
+		// addLastLineBreak:false
+	})=>{
 		
-		rowArrayToCsvText: (rowArray,options={
-			delimiter:',',
-			// lineBreak:'\n',
-			// isUsingHeader:false,
-			wrapper:'"',
-			isUsingWrapper:false,
-			isUsingWrapperAll:false,
-			isUsingSpecialCharacterInWrapper:false,
-			// addLastLineBreak:false
-		})=>{
-			
-			// 先に、すべてのセルの特殊文字をチェック・置換
-			if(options.isUsingWrapper && (options.isUsingSpecialCharacterInWrapper||options.isUsingWrapperAll) ){
-				for(const [cellIndex,cell] of row.entries()){
-					if(options.isUsingWrapperAll || (cell.includes(options.wrapper)||cell.includes(options.delimiter)||cell.includes("\n")||cell.includes("\r"))){ // 安全のため、CR・LFのいずれかがある場合はエスケープ
-						array[rowIndex][cellIndex] = `${options.wrapper}${cell.replace(new RegExp(options.wrapper, 'g'), options.wrapper + options.wrapper)}${options.wrapper}`;
-					}
+		let returnRowArray = [];
+
+		// 先に、すべてのセルの特殊文字をチェック・置換
+		if(options.isUsingWrapper && (options.isUsingSpecialCharacterInWrapper||options.isUsingWrapperAll) ){
+			for(const [cellIndex,cell] of rowArray.entries()){
+				if(options.isUsingWrapperAll || (cell.includes(options.wrapper)||cell.includes(options.delimiter)||cell.includes("\n")||cell.includes("\r"))){ // 安全のため、CR・LFのいずれかがある場合はエスケープ
+					rowArray[cellIndex] = `${options.wrapper}${cell.replace(new RegExp(options.wrapper, 'g'), options.wrapper + options.wrapper)}${options.wrapper}`;
 				}
 			}
-			
-			return rowArray.join(options.delimiter);
-		},
+		}
 		
-		// プロファイル操作
-		exportProfile: ()=>{
-			// プロファイルをエクスポート
-			let profile = {
-				title:"CSV Processor Profile",
-				version: csvProcessor.version,
-				options: csvProcessor.getOptionsFromHtml(),
-			};
-			let profileText = JSON.stringify(profile);
-			let blob = new Blob([profileText], {type: 'application/json'});
-			let url = URL.createObjectURL(blob);
-			let a = document.createElement('a');
-			const profileName = prompt("プロファイルの名前を入力してください:", "profile.json");
-			if (profileName) {
-				a.download = profileName;
-				a.href = url;
-				a.click();
-			}
-		},
-		
-		importProfile: async ()=>{
-			// プロファイルをインポート
-			let input = document.createElement('input');
-			input.type = 'file';
-			input.accept = '.json';
-			input.onchange = async function(event) {
-				let file = event.target.files[0];
-				let reader = new FileReader();
-				reader.onload = async function(event) {
-					let profileText = event.target.result;
-					let profile = JSON.parse(profileText);
-					csvProcessor.setOptionsToHtml(profile.options);
-				};
-				reader.readAsText(file);
-			};
-			input.click();
-		},
-		
-		saveProfile: ()=>{
-			// localStorageにプロファイルを保存
-			let profile = {
-				title:"CSV Processor Profile",
-				version: csvProcessor.version,
-				options: csvProcessor.getOptionsFromHtml(),
-			};
-			// localStorage対応チェック
-			if (typeof localStorage === 'undefined') {
-				alert('このブラウザはlocalStorageに対応していません。');
-				return;
-			}
-			let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
-			if(!currentProfiles)currentProfiles = {};
-			
-			// 名前を入力
-			const profileName = prompt("プロファイルの名前を入力してください:", "profile");
-			if (profileName) {
-				currentProfiles[profileName] = profile;
-				localStorage.setItem('csvProcessorProfiles', JSON.stringify(currentProfiles));
-			}
-			
-			csvProcessor.listLocalProfiles();
-		},
-		
-		listLocalProfiles: ()=>{
-			// localStorageに保存されたプロファイルをリスト表示
-			let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
-			if(!currentProfiles)currentProfiles = {};
-			let profileList = document.getElementById('profileSelect');
-			profileList.innerHTML = '';
-			for(const [profileName,profile] of Object.entries(currentProfiles)){
-				let option = document.createElement('option');
-				option.value = profileName;
-				option.textContent = profileName;
-				profileList.appendChild(option);
-			}
-		},
-		
-		loadProfile: ()=>{
-			// 読込確認
-			if(!confirm("現在の設定を上書きします。よろしいですか？"))return;
-			
-			// localStorageからプロファイルを読み込み
-			let profileList = document.getElementById('profileSelect');
-			let profileName = profileList.value;
-			let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
-			if(!currentProfiles)currentProfiles = {};
-			let profile = currentProfiles[profileName];
-			if(profile){
+		return rowArray.join(options.delimiter);
+	},
+	
+	// プロファイル操作
+	exportProfile: ()=>{
+		// プロファイルをエクスポート
+		let profile = {
+			title:"CSV Processor Profile",
+			version: csvProcessor.version,
+			options: csvProcessor.getOptionsFromHtml(),
+		};
+		let profileText = JSON.stringify(profile);
+		let blob = new Blob([profileText], {type: 'application/json'});
+		let url = URL.createObjectURL(blob);
+		let a = document.createElement('a');
+		const profileName = prompt("プロファイルの名前を入力してください:", "profile.json");
+		if (profileName) {
+			a.download = profileName;
+			a.href = url;
+			a.click();
+		}
+	},
+	
+	importProfile: async ()=>{
+		// プロファイルをインポート
+		let input = document.createElement('input');
+		input.type = 'file';
+		input.accept = '.json';
+		input.onchange = async function(event) {
+			let file = event.target.files[0];
+			let reader = new FileReader();
+			reader.onload = async function(event) {
+				let profileText = event.target.result;
+				let profile = JSON.parse(profileText);
 				csvProcessor.setOptionsToHtml(profile.options);
-			}
-		},
+			};
+			reader.readAsText(file);
+		};
+		input.click();
+	},
+	
+	saveProfile: ()=>{
+		// localStorageにプロファイルを保存
+		let profile = {
+			title:"CSV Processor Profile",
+			version: csvProcessor.version,
+			options: csvProcessor.getOptionsFromHtml(),
+		};
+		// localStorage対応チェック
+		if (typeof localStorage === 'undefined') {
+			alert('このブラウザはlocalStorageに対応していません。');
+			return;
+		}
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
 		
-		removeProfile: ()=>{
-			// 削除確認
-			if(!confirm("本当に削除しますか？"))return;
-			
-			// localStorageからプロファイルを削除
-			let profileList = document.getElementById('profileSelect');
-			let profileName = profileList.value;
-			let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
-			if(!currentProfiles)currentProfiles = {};
-			delete currentProfiles[profileName];
+		// 名前を入力
+		const profileName = prompt("プロファイルの名前を入力してください:", "profile");
+		if (profileName) {
+			currentProfiles[profileName] = profile;
 			localStorage.setItem('csvProcessorProfiles', JSON.stringify(currentProfiles));
-			csvProcessor.listLocalProfiles();
-		},
+		}
 		
+		csvProcessor.listLocalProfiles();
+	},
+	
+	listLocalProfiles: ()=>{
+		// localStorageに保存されたプロファイルをリスト表示
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+		let profileList = document.getElementById('profileSelect');
+		profileList.innerHTML = '';
+		for(const [profileName,profile] of Object.entries(currentProfiles)){
+			let option = document.createElement('option');
+			option.value = profileName;
+			option.textContent = profileName;
+			profileList.appendChild(option);
+		}
+	},
+	
+	loadProfile: ()=>{
+		// 読込確認
+		if(!confirm("現在の設定を上書きします。よろしいですか？"))return;
 		
-		//汎用品
-		dialog: (message)=>{
-			alert(message);
-		},
+		// localStorageからプロファイルを読み込み
+		let profileList = document.getElementById('profileSelect');
+		let profileName = profileList.value;
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+		let profile = currentProfiles[profileName];
+		if(profile){
+			csvProcessor.setOptionsToHtml(profile.options);
+		}
+	},
+	
+	removeProfile: ()=>{
+		// 削除確認
+		if(!confirm("本当に削除しますか？"))return;
 		
-		changeStatusText: (type,message)=>{
-			document.getElementById(`${type}StatusText`).textContent = message;
-		},
+		// localStorageからプロファイルを削除
+		let profileList = document.getElementById('profileSelect');
+		let profileName = profileList.value;
+		let currentProfiles = JSON.parse(localStorage.getItem('csvProcessorProfiles'));
+		if(!currentProfiles)currentProfiles = {};
+		delete currentProfiles[profileName];
+		localStorage.setItem('csvProcessorProfiles', JSON.stringify(currentProfiles));
+		csvProcessor.listLocalProfiles();
+	},
+	
+	
+	//汎用品
+	dialog: (message)=>{
+		alert(message);
+	},
+	
+	changeStatusText: (type,message)=>{
+		document.getElementById(`${type}StatusText`).textContent = message;
+	},
+	
+	addLogText: (type,message,limit=20)=>{
+		let element = document.getElementById(`${type}StatusText`)
+		element.appendChild(document.createElement('p')).textContent = message;
+		if(limit && element.childElementCount > limit){
+			element.removeChild(element.firstChild);
+		}
+	},
+	
+	splitTextArray: (inputTextData,delimiter,returnType)=>{
+		// delimiterは2文字までに対応
 		
-		addLogText: (type,message,limit=20)=>{
-			let element = document.getElementById(`${type}StatusText`)
-			element.appendChild(document.createElement('p')).textContent = message;
-			if(limit && element.childElementCount > limit){
-				element.removeChild(element.firstChild);
+		// まずは1文字ずつの配列に変える
+		// 文字列だったら、1文字ずつの配列に変える
+		let textArray = [];
+		if (typeof inputTextData === 'string') {
+			textArray = inputTextData.split('');
+		} else if (Array.isArray(inputTextData)) {
+			textArray = inputTextData; // 配列だったらそのまま
+		}
+		
+		let resultArray = [];
+		let cellArray	= [];
+		if(delimiter.length == 1){
+			for(let i = 0; i < textArray.length; i++){
+				if(textArray[i] == delimiter){
+					resultArray.push(cellArray);
+					cellArray = [];
+				}else{
+					cellArray.push(textArray[i]);
+				}
 			}
-		},
-		
-		splitTextArray: (inputTextData,delimiter,returnType)=>{
-			// delimiterは2文字までに対応
-			
-			// まずは1文字ずつの配列に変える
-			// 文字列だったら、1文字ずつの配列に変える
-			let textArray = [];
-			if (typeof inputTextData === 'string') {
-				textArray = inputTextData.split('');
-			} else if (Array.isArray(inputTextData)) {
-				textArray = inputTextData; // 配列だったらそのまま
+		}else if(delimiter.length == 2){
+			for(let i = 0; i < textArray.length; i++){
+				if(textArray[i] == delimiter[0] && textArray[i+1] == delimiter[1]){
+					resultArray.push(cellArray);
+					cellArray = [];
+					i++;
+				}else{
+					cellArray = textArray[i];
+				}
 			}
+		}
+		// 最後のセルを追加
+		resultArray.push(cellArray);
+		
+		switch(returnType){
+			case 'String':
+			return resultArray.map(cellArray => cellArray.join(''));
+			case 'Array':
+			return resultArray;
 			
-			let resultArray = [];
-			let cellArray	= [];
-			if(delimiter.length == 1){
-				for(let i = 0; i < textArray.length; i++){
-					if(textArray[i] == delimiter){
-						resultArray.push(cellArray);
-						cellArray = [];
+		}
+		
+	},
+	
+	uInt8ArrayToTextArray: (uInt8Array,encode,done)=>{
+		// マルチバイト文字に対応しつつ、1文字ずつの配列に変換
+		// 文字コードのデコードもする
+		
+		// doneがtrueの場合は、あまりを返さない(強制的に変換する)
+		// バイト列が不正だった場合はエラーになると思われる
+		// 将来的にはdone不要になってほしい
+		
+		let resultArray = [];
+		// const limit = 1;
+		const limit = 50_000_000;
+		let lastSplitPosition = 0;
+		let textArray = []; // 分割前テキスト配列(中身はUInt8)
+		for(let i = 0; i < uInt8Array.length; i++){
+			textArray.push(uInt8Array[i]);
+			if(textArray.length >= limit || i > uInt8Array.length-20){
+				// encodeごとに、区切って良い位置かを判定
+				let breakSafeFlag
+				switch(encode){
+					case 'utf-8':
+					case 'euc-jp':
+					//1バイト文字(の直後)なら区切ってOK
+					if(uInt8Array[i] < 0x80){
+						breakSafeFlag = true;
 					}else{
-						cellArray.push(textArray[i]);
+						breakSafeFlag = false;
 					}
-				}
-			}else if(delimiter.length == 2){
-				for(let i = 0; i < textArray.length; i++){
-					if(textArray[i] == delimiter[0] && textArray[i+1] == delimiter[1]){
-						resultArray.push(cellArray);
-						cellArray = [];
-						i++;
+					break;
+					
+					case 'shift-jis':
+					//2バイト文字の1バイト目は区切ってはダメ
+					if(uInt8Array[i] >= 0x81 && uInt8Array[i] <= 0x9f || uInt8Array[i] >= 0xe0 && uInt8Array[i] <= 0xfc){
+						breakSafeFlag = false;
 					}else{
-						cellArray = textArray[i];
+						breakSafeFlag = true;
 					}
+					break;
+					
+					case 'iso-2022-jp':
+					//マルチバイト文字の場合は(1文字目でも2文字目でも)区切ってはいけない
+					if(uInt8Array[i] >= 0x21 && uInt8Array[i] <= 0x7e){
+						breakSafeFlag = false;
+					}else{
+						breakSafeFlag = true;
+					}
+					break;
+					
+					case 'utf-16':
+					case 'utf-16be':
+					//奇数文字目の文字は区切ってはいけない
+					//例:i=0はダメ i=1はOK
+					if(i % 2 == 1){
+						//サロゲートペアは区切ったらダメ
+						if(uInt8Array[i-1] >= 0xd8 && uInt8Array[i-1] <= 0xdf){
+							breakSafeFlag = false;
+						}else{
+							breakSafeFlag = true;
+						}
+					}else{
+						breakSafeFlag = false;
+					}
+					break;
+					case 'utf-16le':
+					//奇数文字目の文字は区切ってはいけない
+					//例:i=0はダメ i=1はOK
+					if(i % 2 == 1){
+						//サロゲートペアは区切ったらダメ
+						if(uInt8Array[i] >= 0xd8 && uInt8Array[i] <= 0xdf){
+							breakSafeFlag = false;
+						}else{
+							breakSafeFlag = true;
+						}
+					}else{
+						breakSafeFlag = false;
+					}
+					break;
+				}
+				if(breakSafeFlag || (i == uInt8Array.length-1 && done)){
+					// console.log("break 1",i);
+					let uInt8Array = new Uint8Array(textArray);
+					// console.log("break 2",i);
+					let text = new TextDecoder(encode).decode(uInt8Array);
+					// console.log("break 3",i);
+					let textArrayEncoded = text.split('');
+					// console.log("break 4",i);
+					resultArray = [...resultArray,...textArrayEncoded];
+					// console.log("break 5",i);
+					textArray = [];
+					lastSplitPosition = i;
+					// console.log("break 6",i);
 				}
 			}
-			// 最後のセルを追加
-			resultArray.push(cellArray);
-			
-			switch(returnType){
-				case 'String':
-				return resultArray.map(cellArray => cellArray.join(''));
-				case 'Array':
-				return resultArray;
-				
-			}
-			
-		},
+		}
+		let rest = uInt8Array.slice(lastSplitPosition+1);
+		// if(rest.length == 0)rest = null;
 		
-		uInt8ArrayToTextArray: (uInt8Array,encode,done)=>{
-			// マルチバイト文字に対応しつつ、1文字ずつの配列に変換
-			// 文字コードのデコードもする
-			
-			// doneがtrueの場合は、あまりを返さない(強制的に変換する)
-			// バイト列が不正だった場合はエラーになると思われる
-			// 将来的にはdone不要になってほしい
-			
-			let resultArray = [];
-			// const limit = 1;
-			const limit = 50_000_000;
-			let lastSplitPosition = 0;
-			let textArray = []; // 分割前テキスト配列(中身はUInt8)
-			for(let i = 0; i < uInt8Array.length; i++){
-				textArray.push(uInt8Array[i]);
-				if(textArray.length >= limit || i == uInt8Array.length-1){
-					// encodeごとに、区切って良い位置かを判定
-					let breakSafeFlag
-					switch(encode){
-						case 'utf-8':
-						case 'euc-jp':
-						//1バイト文字(の直後)なら区切ってOK
-						if(uInt8Array[i] < 0x80){
-							breakSafeFlag = true;
-						}else{
-							breakSafeFlag = false;
-						}
-						break;
-						
-						case 'shift-jis':
-						//2バイト文字の1バイト目は区切ってはダメ
-						if(uInt8Array[i] >= 0x81 && uInt8Array[i] <= 0x9f || uInt8Array[i] >= 0xe0 && uInt8Array[i] <= 0xfc){
-							breakSafeFlag = false;
-						}else{
-							breakSafeFlag = true;
-						}
-						break;
-						
-						case 'iso-2022-jp':
-						//マルチバイト文字の場合は(1文字目でも2文字目でも)区切ってはいけない
-						if(uInt8Array[i] >= 0x21 && uInt8Array[i] <= 0x7e){
-							breakSafeFlag = false;
-						}else{
-							breakSafeFlag = true;
-						}
-						break;
-						
-						case 'utf-16':
-						case 'utf-16be':
-						//奇数文字目の文字は区切ってはいけない
-						//例:i=0はダメ i=1はOK
-						if(i % 2 == 1){
-							//サロゲートペアは区切ったらダメ
-							if(uInt8Array[i-1] >= 0xd8 && uInt8Array[i-1] <= 0xdf){
-								breakSafeFlag = false;
-							}else{
-								breakSafeFlag = true;
-							}
-						}else{
-							breakSafeFlag = false;
-						}
-						break;
-						case 'utf-16le':
-						//奇数文字目の文字は区切ってはいけない
-						//例:i=0はダメ i=1はOK
-						if(i % 2 == 1){
-							//サロゲートペアは区切ったらダメ
-							if(uInt8Array[i] >= 0xd8 && uInt8Array[i] <= 0xdf){
-								breakSafeFlag = false;
-							}else{
-								breakSafeFlag = true;
-							}
-						}else{
-							breakSafeFlag = false;
-						}
-						break;
-					}
-					if(breakSafeFlag || (i == uInt8Array.length-1 && done)){
-						// console.log("break 1",i);
-						let uInt8Array = new Uint8Array(textArray);
-						// console.log("break 2",i);
-						let text = new TextDecoder(encode).decode(uInt8Array);
-						// console.log("break 3",i);
-						let textArrayEncoded = text.split('');
-						// console.log("break 4",i);
-						resultArray = [...resultArray,...textArrayEncoded];
-						// console.log("break 5",i);
-						textArray = [];
-						lastSplitPosition = i;
-						// console.log("break 6",i);
-					}
-				}
-			}
-			let rest = uInt8Array.slice(lastSplitPosition+1);
-			// if(rest.length == 0)rest = null;
-			
-			return [resultArray,rest];
-		},
-		
-		
-		
-		// encodeToSjis: (content)=>{
-			// 	// from:https://qiita.com/dopperi46/items/49441391fa0e3beae3da
-		// 	let buffer = [];
-		// 	for (let i = 0; i < content.length; i++) {
-		// 		const c = content.codePointAt(i);
-		// 		if (c > 0xffff) {
-		// 				i++;
-		// 		}
-		// 		if (c < 0x80) {
-		// 				buffer.push(c);
-		// 		}
-		// 		else if (c >= 0xff61 && c <= 0xff9f) {
-		// 				buffer.push(c - 0xfec0);
-		// 		}
-		// 		else {
-		// 			const d = this.sjisEncodeTable[String.fromCodePoint(c)] || 0x3f;
-		// 			if (d > 0xff) {
-		// 					buffer.push(d >> 8 & 0xff, d & 0xff);
-		// 			}
-		// 			else {
-		// 					buffer.push(d);
-		// 			}
-		// 		}
-		// 	}
-		// 	return Uint8Array.from(buffer);
-		// },
+		return [resultArray,rest];
+	},
+	
+	
+	
+	// encodeToSjis: (content)=>{
+		// 	// from:https://qiita.com/dopperi46/items/49441391fa0e3beae3da
+	// 	let buffer = [];
+	// 	for (let i = 0; i < content.length; i++) {
+	// 		const c = content.codePointAt(i);
+	// 		if (c > 0xffff) {
+	// 				i++;
+	// 		}
+	// 		if (c < 0x80) {
+	// 				buffer.push(c);
+	// 		}
+	// 		else if (c >= 0xff61 && c <= 0xff9f) {
+	// 				buffer.push(c - 0xfec0);
+	// 		}
+	// 		else {
+	// 			const d = this.sjisEncodeTable[String.fromCodePoint(c)] || 0x3f;
+	// 			if (d > 0xff) {
+	// 					buffer.push(d >> 8 & 0xff, d & 0xff);
+	// 			}
+	// 			else {
+	// 					buffer.push(d);
+	// 			}
+	// 		}
+	// 	}
+	// 	return Uint8Array.from(buffer);
+	// },
 		
 	}
 	

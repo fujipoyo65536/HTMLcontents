@@ -73,12 +73,6 @@
 									<button id="directoryReloadButton" disabled>再読込</button>
 									<span id="inputDirectoryStatusText">－</span>
 								</div>
-								<div class="optionSet">
-									<label class="optionBox"><input type="radio" name="inputMethod" value="direct" data-option="inputMethod">
-										直接入力</label><br>
-									<textarea id="inputCsvTextInput" rows="10" cols="50" placeholder="ここに直接入力することもできます"
-										data-option="inputCsvText"></textarea>
-								</div>
 							</div>
 							<div class="subPane">
 								<div class="paneTitle">出力</div>
@@ -90,6 +84,12 @@
 						</div>
 					</div>
 					<div id="inputPreviewTab" class="tabContent" data-tab="inputPreview">
+						<div class="optionSet">
+							<label class="optionBox"><input type="radio" name="inputMethod" value="direct" data-option="inputMethod">
+								直接入力</label><br>
+							<textarea id="inputCsvTextInput" rows="10" cols="50" placeholder="ここに直接入力することもできます"
+								data-option="inputCsvText"></textarea>
+						</div>
 						<div>
 							<label class="optionBox">文字数リミット : <input type="number" id="inputPreviewCharLimitInput" value="1000"
 									style="width: 5em;">文字</label><br>
@@ -148,7 +148,9 @@
 										<option value="CRLF" selected>CRLF</option>
 										<option value="CR">CR</option>
 										<option value="LF">LF</option>
+										<option value="CUSTOM">その他</option>
 									</select>
+									その他:<input type="text" id="inputLineBreakCustomInput" style="width: 3em;" data-option="inputLineBreakCustom">
 								</td>
 							</tr>
 							<tr>
@@ -244,7 +246,9 @@
 										<option value="CRLF" selected>CRLF</option>
 										<option value="CR">CR</option>
 										<option value="LF">LF</option>
+										<option value="CUSTOM">その他</option>
 									</select>
+									その他:<input type="text" id="outputLineBreakCustomInput" style="width: 3em;" data-option="outputLineBreakCustom">
 								</td>
 							</tr>
 							<tr>
@@ -380,61 +384,53 @@
 						</div>
 					</div>
 					<div id="perRowProcessTab" class="tabContent">
-						<p>
-							ここで使える変数(前述に加えて)
-						<table>
-							<tr>
-								<th>rowIndex</th>
-								<td>行インデックス(何行目か) チャンク分割を考慮</td>
-							</tr>
-							<tr>
-								<th>rowArray</th>
-								<td>行のオブジェクト(セルごと)</td>
-							</tr>
-							<tr>
-								<th>rowText</th>
-								<td>行のテキスト</td>
-							</tr>
-						</table>
-						配列を返すことで、rowArrayを書き換えることが可能
-						</p>
-						<div id="perRowProcesses">
-							<div class="perRowProcess" data-perRowProcessNum="0" data-perRowProcessType="perRowCode">
-								<textarea class="code" data-processOption="perRowCode" data-option="perRowCode"></textarea>
+						<div>
+							<div class="subPane">
+								<div class="codeMirrorBox">
+									<textarea class="code" data-processOption="perRowCode" data-option="perRowCode" id="perRowCode">//example</textarea>
+								</div>
+								<p>配列を返すことで、rowArrayを書き換えることが可能</p>
+							</div>
+							<div class="subPane">
+								<div class="paneTitle">ここで使える変数</div>
+								<table>
+									<tr><th>rowIndex</th><td>行インデックス(何行目か) チャンク分割を考慮</td></tr>
+									<tr><th>rowArray</th><td>行のオブジェクト(セルごと)</td></tr>
+									<tr><th>rowText</th><td>行のテキスト</td></tr>
+								</table>
 							</div>
 						</div>
 					</div>
 					<div id="perCellProcessTab" class="tabContent">
-						<p>
-							ここで使える変数(前述に加えて)
-						<table>
-							<tr>
-								<th>cellIndex</th>
-								<td>セルのインデックス(何列目か)</td>
-							</tr>
-							<tr>
-								<th>cellText</th>
-								<td>セルのテキスト</td>
-							</tr>
-						</table>
-						文字列・数値・真偽値を返すことで、cellTextを書き換えることが可能
-						</p>
-						<div id="perCellProcesses">
-							<div class="perCellProcess" data-perCellProcessNum="0" data-perCellProcessType="perCellCode">
-								<textarea class="code" data-processOption="perCellCode" data-option="perCellCode"></textarea>
+						<div>
+							<div class="subPane">
+								<div class="codeMirrorBox">
+									<textarea class="code" data-processOption="perCellCode" data-option="perCellCode" id="perCellCode">//example</textarea>
+								</div>
+								<p>文字列・数値・真偽値を返すことで、cellTextを書き換えることが可能</p>
+							</div>
+							<div class="subPane">
+								<div class="paneTitle">ここで使える変数</div>
+								<table>
+									<tr><th>cellIndex</th><td>セルのインデックス(何列目か)</td></tr>
+									<tr><th>cellText</th><td>セルのテキスト</td></tr>
+								</table>
 							</div>
 						</div>
 					</div>
 					<div id="perOutputProcessTab" class="tabContent">
-						<p>
-							ここで使える変数
-							<table>
-								<tr><th>rowArrays</th><td>書き込み予定のデータ(2次元)</td></tr>
-							</table>
-						</p>
-						<div id="perOutputProcesses">
-							<div class="perOutputProcess" data-perOutputProcessNum="0" data-perOutputProcessType="perOutputCode">
-								<textarea class="code" data-processOption="perOutputCode" data-option="perOutputCode"></textarea>
+						<div>
+							<div class="subPane">
+								<div class="codeMirrorBox">
+									<textarea class="code" data-processOption="perOutputCode" data-option="perOutputCode" id="perOutputCode">//example</textarea>
+								</div>
+								<p>配列を返すことで、書き込み予定のデータ(rowArrays)を書き換えることが可能</p>
+							</div>
+							<div class="subPane">
+								<div class="paneTitle">ここで使える変数</div>
+								<table>
+									<tr><th>rowArrays</th><td>書き込み予定のデータ(2次元)</td></tr>
+								</table>
 							</div>
 						</div>
 					</div>
