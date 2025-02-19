@@ -14,6 +14,7 @@
 // UI調整 折りたたみ
 // ディレクトリの書き出し
 // プロファイル読込・書き出しの改善・削除機能
+// 強制的な処理の打ち切り
 
 // ●やる気がないもの
 // perProcessFuncを追加 →使い道が思いつかないので保留
@@ -1767,6 +1768,10 @@ const csvProcessor = {
 			title:"CSV Processor Profile",
 			version: csvProcessor.version,
 			options: csvProcessor.getOptionsFromHtml(),
+			perInputCode: csvProcessor.editors.perInputCode.getValue(),
+			perRowCode: csvProcessor.editors.perRowCode.getValue(),
+			perCellCode: csvProcessor.editors.perCellCode.getValue(),
+			perOutputCode: csvProcessor.editors.perOutputCode.getValue(),
 		};
 		let profileText = JSON.stringify(profile);
 		let blob = new Blob([profileText], {type: 'application/json'});
@@ -1792,6 +1797,10 @@ const csvProcessor = {
 				let profileText = event.target.result;
 				let profile = JSON.parse(profileText);
 				csvProcessor.setOptionsToHtml(profile.options);
+				csvProcessor.editors.perInputCode.setValue(profile.perInputCode);
+				csvProcessor.editors.perRowCode.setValue(profile.perRowCode);
+				csvProcessor.editors.perCellCode.setValue(profile.perCellCode);
+				csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);				
 			};
 			reader.readAsText(file);
 		};
@@ -1804,6 +1813,10 @@ const csvProcessor = {
 			title:"CSV Processor Profile",
 			version: csvProcessor.version,
 			options: csvProcessor.getOptionsFromHtml(),
+			perInputCode: csvProcessor.editors.perInputCode.getValue(),
+			perRowCode: csvProcessor.editors.perRowCode.getValue(),
+			perCellCode: csvProcessor.editors.perCellCode.getValue(),
+			perOutputCode: csvProcessor.editors.perOutputCode.getValue(),
 		};
 		// localStorage対応チェック
 		if (typeof localStorage === 'undefined') {
@@ -1849,6 +1862,10 @@ const csvProcessor = {
 		let profile = currentProfiles[profileName];
 		if(profile){
 			csvProcessor.setOptionsToHtml(profile.options);
+			csvProcessor.editors.perInputCode.setValue(profile.perInputCode);
+			csvProcessor.editors.perRowCode.setValue(profile.perRowCode);
+			csvProcessor.editors.perCellCode.setValue(profile.perCellCode);
+			csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);		
 		}
 	},
 	
