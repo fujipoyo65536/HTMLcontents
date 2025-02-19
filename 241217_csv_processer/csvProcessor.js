@@ -1797,10 +1797,19 @@ const csvProcessor = {
 				let profileText = event.target.result;
 				let profile = JSON.parse(profileText);
 				csvProcessor.setOptionsToHtml(profile.options);
+				//一旦codePaneのすべてのタブを表示
+				const codePaneTabs = document.querySelectorAll('#codePaneTabBox>.tab');
+				codePaneTabs.forEach(function(tab) {
+					tab.style.display = 'block';
+				});
 				csvProcessor.editors.perInputCode.setValue(profile.perInputCode);
 				csvProcessor.editors.perRowCode.setValue(profile.perRowCode);
 				csvProcessor.editors.perCellCode.setValue(profile.perCellCode);
 				csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);				
+				//codePaneをもとに戻す
+				codePaneTabs.forEach(function(tab) {
+					tab.style.removeProperty('display');
+				}
 			};
 			reader.readAsText(file);
 		};
@@ -1862,10 +1871,19 @@ const csvProcessor = {
 		let profile = currentProfiles[profileName];
 		if(profile){
 			csvProcessor.setOptionsToHtml(profile.options);
+			// 一旦codePaneのすべてのタブを表示
+			const codePaneTabs = document.querySelectorAll('#codePaneTabBox>.tab');
+			codePaneTabs.forEach(function(tab) {
+				tab.style.display = 'block';
+			});
 			csvProcessor.editors.perInputCode.setValue(profile.perInputCode);
 			csvProcessor.editors.perRowCode.setValue(profile.perRowCode);
 			csvProcessor.editors.perCellCode.setValue(profile.perCellCode);
 			csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);		
+			// codePaneをもとに戻す
+			codePaneTabs.forEach(function(tab) {
+				tab.style.removeProperty('display');
+			});
 		}
 	},
 	
