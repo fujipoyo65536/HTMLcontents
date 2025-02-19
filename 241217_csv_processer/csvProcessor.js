@@ -1809,7 +1809,7 @@ const csvProcessor = {
 				//codePaneをもとに戻す
 				codePaneTabs.forEach(function(tab) {
 					tab.style.removeProperty('display');
-				}
+				});
 			};
 			reader.readAsText(file);
 		};
