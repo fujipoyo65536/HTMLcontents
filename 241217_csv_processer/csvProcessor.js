@@ -228,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	const outputButton = document.getElementById('outputButton');
 	outputButton.addEventListener('click', async function(){
 		// csvProcessor.processAll();
+		document.querySelectorAll('#codePaneTabBox>.tab')[4].click();
 		csvProcessor.processAllStream();
 	});
 	
