@@ -1175,7 +1175,7 @@ const csvProcessor = {
 					rowArrays,
 					options,
 					// csvProcessor
-				});
+				},csvProcessor.sessionMemory);
 				if (Array.isArray(tmp)) {
 					// csvArray[rowIndex] = tmp;
 					rowArrays = tmp;
@@ -1434,7 +1434,8 @@ const csvProcessor = {
 				break;
 		}
 		
-		// 改行をLFに統一
+		// 今後の処理で、改行コードが2文字だと支障があるので、LFに統一
+		// ★データ(ダブルクォーテーション)内の改行もあわせて置換してしまうが、そういう仕様として扱う
 		let tmpArray = [];
 		if(options.lineBreakSelect == "ALL"){
 			for( let i = 0; i < csvTextArray.length; i++){
