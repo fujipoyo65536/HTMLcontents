@@ -1200,7 +1200,7 @@ const csvProcessor = {
 				isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
 				// addLastLineBreak: options.outputAddLastLineBreak || false,
 			});
-			if(i != csvProcessor.outputFiles[outputFileFullName].outputBuffer.length-1 || csvProcessor.options.outputAddLastLineBreak){
+			if(i != rowArrays.length-1 || csvProcessor.options.outputAddLastLineBreak){
 				outputText += csvProcessor.options.outputLineBreak;
 			}
 		}
