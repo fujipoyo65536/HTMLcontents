@@ -685,7 +685,7 @@ const csvProcessor = {
 				for(const outputFileName of outputFileNames){
 					const outputFileFullName = `${outputFileName}`;
 					// 出力ファイルに書き込み
-					await csvProcessor.outputToFile(outputFileFullName,outputText);
+					await csvProcessor.outputToFile(outputFileFullName,outputText,false);
 				}
 			}
 			
@@ -803,7 +803,7 @@ const csvProcessor = {
 			const csvArrayAfterProcess = await csvProcessor.processCsvStream(csvIndex);
 			// 処理方法が「入力ファイルごとに書き込み」の場合、ここでファイル書き込み処理を行う
 			if(options.outputWritingTiming == "input"){
-				csvProcessor.writeToAllFile();
+				csvProcessor.writeToAllFile(false);
 			}
 			csvProcessor.addLogText("output",`ファイル処理完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
 			//csvProcessorをクリーンにする
@@ -1061,7 +1061,7 @@ const csvProcessor = {
 						for(const outputFileName of outputFileNames){
 							const outputFileFullName = `${outputFileName}`;
 							// 出力ファイルに書き込み
-							await csvProcessor.outputToFile(outputFileFullName,rowArray);
+							await csvProcessor.outputToFile(outputFileFullName,rowArray,false);
 						}
 						rowArray = undefined;
 					}// if
@@ -1129,7 +1129,7 @@ const csvProcessor = {
 		return writeableStream;
 	},
 	
-	outputToFile: async (outputFileFullName,rowArray)=>{
+	outputToFile: async (outputFileFullName,rowArray,last=false)=>{
 		// バッファに書き込み
 		await csvProcessor.writeToBuffer(outputFileFullName,rowArray);
 		// writeableStreamを取得(ファイルがない場合は作成)
@@ -1140,7 +1140,7 @@ const csvProcessor = {
 			(csvProcessor.options.outputWritingTiming == "1000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 1000) ||
 			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 10000)
 		){
-			await csvProcessor.writeToFile(outputFileFullName);
+			await csvProcessor.writeToFile(outputFileFullName,last);
 		}
 	},
 	
@@ -1156,13 +1156,13 @@ const csvProcessor = {
 		csvProcessor.outputFiles[outputFileFullName].outputRowCount++;
 	},
 	
-	writeToAllFile: async ()=>{
+	writeToAllFile: async (last=true)=>{
 		for(const [outputFileFullName,outputFile] of Object.entries(csvProcessor.outputFiles)){
-			await csvProcessor.writeToFile(outputFileFullName);
+			await csvProcessor.writeToFile(outputFileFullName,last);
 		}
 	},
 	
-	writeToFile: async (outputFileFullName) => {
+	writeToFile: async (outputFileFullName,last=false) => {
 		
 		const writeableStream = csvProcessor.outputFiles[outputFileFullName].writeableStream;
 		const options = csvProcessor.options;
@@ -1200,7 +1200,7 @@ const csvProcessor = {
 				isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
 				// addLastLineBreak: options.outputAddLastLineBreak || false,
 			});
-			if(i != rowArrays.length-1 || csvProcessor.options.outputAddLastLineBreak){
+			if(!last || i != rowArrays.length-1 || csvProcessor.options.outputAddLastLineBreak){
 				outputText += csvProcessor.options.outputLineBreak;
 			}
 		}
@@ -1229,7 +1229,7 @@ const csvProcessor = {
 		const writeableStream = csvProcessor.outputFiles[outputFileFullName].writeableStream;
 		
 		// バッファに残っているものを書き込む
-		await csvProcessor.writeToFile(outputFileFullName);
+		await csvProcessor.writeToFile(outputFileFullName,true);
 		let outputText = "";
 		
 		// 改行を追加
