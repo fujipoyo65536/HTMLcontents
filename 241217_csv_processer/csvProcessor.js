@@ -1188,7 +1188,7 @@ const csvProcessor = {
 		
 		// 出力テキストを作る
 		let outputText = "";
-		for(let i = 0; i < csvProcessor.outputFiles[outputFileFullName].outputBuffer.length; i++){
+		for(let i = 0; i < rowArrays.length; i++){
 			const rowArray = rowArrays[i];
 			outputText += csvProcessor.rowArrayToCsvText(rowArray,{
 				delimiter: options.outputDelimiter || ',',
