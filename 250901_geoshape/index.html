@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geoshape tools</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    .loading {
+      color: #666;
+      font-style: italic;
+    }
+    .error {
+      color: red;
+    }
+    /* 階層リストのスタイル */
+    .directory-tree {
+      margin-top: 20px;
+    }
+    .directory-tree ul {
+      list-style-type: none;
+      margin: 0;
+      padding-left: 20px;
+      border-left: 1px solid #ddd;
+    }
+    .directory-tree > ul {
+      border-left: none;
+      padding-left: 0;
+    }
+    .directory-tree li {
+      margin: 5px 0;
+      position: relative;
+    }
+    .directory-tree li::before {
+      content: '';
+      position: absolute;
+      left: -20px;
+      top: 15px;
+      width: 15px;
+      height: 1px;
+      background-color: #ddd;
+    }
+    .directory-tree li:last-child::after {
+      content: '';
+      position: absolute;
+      left: -20px;
+      top: 15px;
+      bottom: -10px;
+      width: 1px;
+      background-color: white;
+    }
+    .directory-node {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .directory-node:hover {
+      background-color: #f8f9fa;
+    }
+    .directory-name {
+      font-weight: bold;
+      color: #495057;
+    }
+    .directory-path {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: #6c757d;
+      background-color: #f8f9fa;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .directory-url {
+      font-size: 0.85em;
+    }
+    .directory-url a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .directory-url a:hover {
+      text-decoration: underline;
+    }
+    .folder-icon {
+      color: #ffc107;
+      font-weight: bold;
+    }
+    .file-icon {
+      color: #17a2b8;
+    }
+    .download-button {
+      margin-left: 10px;
+    }
+    .download-button button {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .download-button button:hover {
+      background-color: #218838;
+    }
+    .download-button button:active {
+      background-color: #1e7e34;
+    }
+    /* 青色ボタン（分割ダウンロード用）のホバー効果 */
+    .download-button button[style*="background-color: rgb(0, 123, 255)"]:hover,
+    .download-button button[style*="background-color: #007bff"]:hover {
+      background-color: #0056b3 !important;
+    }
+    .download-button button[style*="background-color: rgb(0, 123, 255)"]:active,
+    .download-button button[style*="background-color: #007bff"]:active {
+      background-color: #004085 !important;
+    }
+  </style>
+  <script src="geoshape.js"></script>
+</head>
+<body>
+  <h1>Geoshape ディレクトリ一覧</h1>
+  <button onclick="loadDirectoryList()">ディレクトリ一覧を取得</button>
+  <div id="status" class="loading"></div>
+  <div id="treeContainer" class="directory-tree"></div>
+</body>
+</html>
