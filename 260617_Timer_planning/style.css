@@ -1,36 +1,201 @@
-:root{--gap:12px;--bg:#f6f7fb;--accent:#4a90e2}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Meiryo,Arial;background:var(--bg);color:#111}
-header{padding:16px;background:#fff;border-bottom:1px solid #e6e6e6}
+@import url('https://fonts.googleapis.com/css2?family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=PT+Mono&display=swap');
+
+:root {
+  --gap: 12px;
+  --bg: #100227;
+  --text: #DDE;
+  --highlight1: #E6E6E6;
+  --highlight2: #FAFAFA;
+  --accent: #07274d;
+}
+
+* {
+  box-sizing: border-box
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, Segoe UI, Meiryo, Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* layout grid: left = display, right = sidebar */
-.layout-grid{padding:16px;display:grid;grid-template-columns:1fr 360px;gap:16px;height:calc(100vh - 72px)}
-.display{display:flex;flex-direction:column;gap:12px}
-.big-time{background:#fff;padding:18px;border-radius:6px;border:1px solid #e6e6e6;display:flex;justify-content:space-between;align-items:center}
-.big-num{font-size:36px;font-weight:700;color:var(--accent)}
-.timeline{background:#fff;padding:12px;border-radius:6px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
-.bars{display:flex;align-items:center;height:64px;border-radius:6px;overflow:hidden;background:#fafafa;border:1px solid #eee;padding:6px}
-.bar{height:100%;display:flex;align-items:center;padding:8px;color:#fff;font-weight:600;font-size:14px;border-radius:8px;margin-right:6px;box-shadow:0 1px 0 rgba(0,0,0,0.06)}
-.bars .bar:last-child{margin-right:0}
+#wrapper {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr auto auto;
+  grid-template-areas:
+    "mainClockPane programEditorPane"
+    "timelinePane timelinePane"
+    "controlPane controlPane";
+  gap: 16px;
+  height: 100%
+}
 
-.current-block{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.big-num.large{font-size:56px}
-.prog-list{list-style:none;padding:8px 0 0 0;margin:0;max-height:160px;overflow:auto}
-.prog-list li{display:flex;justify-content:space-between;padding:6px 4px;border-top:1px dashed #eee;font-size:13px}
-.small{font-size:12px;color:#444}
 
-.bottom-controls{background:#fff;padding:12px;border-radius:6px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
-.control-row{display:flex;gap:8px;align-items:center}
-.controls input{width:160px;padding:6px}
+/* ---------- main clock box ---------- */
+#mainClockPane {
+  grid-area: mainClockPane
+}
 
-.sidebar{background:#fff;padding:12px;border-radius:6px;border:1px solid #e6e6e6;overflow:auto}
-.program-editor{max-height:60vh;overflow:auto;padding-bottom:8px}
-.program-table{width:100%;border-collapse:collapse}
-.program-table th,.program-table td{border-bottom:1px solid #eee;padding:6px;font-size:13px}
-.program-table th{background:#fafafa;text-align:left}
-.program-table input, .program-table select{width:80px}
-.program-table td.namecol input{width:140px}
+#mainClockBox {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
 
-.editor textarea{width:100%;height:180px;padding:8px;font-family:monospace;font-size:13px}
+#mainClockName {
+  /* keep name small but readable */
+  font-size: clamp(14px, 20vh, 5vw);
+  line-height: 1;
+  margin-bottom: 6px;
+}
 
-.btn{padding:6px 8px;background:var(--accent);color:#fff;border-radius:4px;border:0;cursor:pointer}
+#mainClockTimer {
+  /* font-family: 'Chivo Mono', monospace; */
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  font-size: clamp(32px, 50vh, 15vw);
+}
 
+/* ---------- time line pane ---------- */
+
+#timelinePane {
+  grid-area: timelinePane
+}
+
+
+#timeLineBox{
+  display: flex;
+  flex-direction: column;
+  /* gap: 8px */
+}
+
+#bars {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  overflow: hidden;
+  padding: 6px
+}
+
+.bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  color: var(--bg);
+  background: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid #000;
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06)
+}
+
+
+/* ---------- control pane ---------- */
+
+#controlPane {
+  grid-area: controlPane;
+  margin: 5px;
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.controls input {
+  width: 160px;
+  padding: 6px
+}
+
+.btn {
+  padding: 6px 8px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  border: 0;
+  cursor: pointer
+}
+
+/* ---------- program editor pane ---------- */
+#programEditorPane {
+  grid-area: programEditorPane;
+  padding: 12px;
+}
+
+/* inputs inside program editor should blend with background
+   include inputs without explicit type attribute (defaults to text) */
+#programEditorPane input,
+#programEditorPane select,
+#programEditorPane textarea {
+  color: inherit;
+  background: transparent;
+  /* show a subtle border for clarity (can remove later) */
+  border: 1px solid var(--highlight1);
+  border-radius: 4px;
+  outline: none;
+  box-shadow: none;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  font: inherit;
+}
+
+/* remove number input spinners for cleaner look */
+#programEditorPane input[type="number"]::-webkit-outer-spin-button,
+#programEditorPane input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#programEditorPane input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* style select to blend and show a clean custom arrow */
+#programEditorPane select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: transparent;
+  color: inherit;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  padding-right: 28px; /* space for arrow */
+  position: relative;
+}
+
+/* add a subtle CSS arrow using background gradients */
+#programEditorPane select {
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 6px), calc(100% - 8px) calc(50% - 6px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* options: match dark background and readable text */
+#programEditorPane option {
+  background: var(--bg);
+  color: var(--text);
+  padding: 6px 8px;
+}
+
+/* focus state for accessibility */
+#programEditorPane select:focus {
+  border-color: rgba(255,255,255,0.16);
+  box-shadow: 0 0 0 3px rgba(7,39,77,0.12);
+}

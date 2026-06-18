@@ -1,56 +1,51 @@
 <!doctype html>
 <html lang="ja">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>会議タイマー プロトタイプ</title>
   <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header>
-    <h1>会議タイマー（プロトタイプ）</h1>
-  </header>
-
-  <main class="layout-grid">
-    <section class="display">
-      <div class="big-time">
-        <div class="total-block">
-          <div>総時間</div>
-          <div id="bigTotal" class="big-num">3600s</div>
-        </div>
-        <div class="current-block">
-          <div id="currentName" class="small">現在</div>
-          <div id="currentRemain" class="big-num large">—</div>
-        </div>
-      </div>
-
-      <div class="timeline">
-        <div id="bars" class="bars"></div>
-        <ul id="progList" class="prog-list"></ul>
-      </div>
-
-      <div class="controls bottom-controls">
-        <div class="control-row">
-          <label>総時間（秒） <input id="totalTime" type="number" value="3600" /></label>
-          <button id="applyBtn" class="btn">調整を実行</button>
-          <button id="resetBtn" class="btn">サンプル読込</button>
-        </div>
-        <div class="control-row">
-          <button id="playBtn" class="btn">開始</button>
-          <button id="pauseBtn" class="btn">一時停止</button>
-          <button id="stepBtn" class="btn">次へ</button>
-        </div>
-      </div>
-    </section>
-
-    <aside class="sidebar">
-      <h2>プログラム一覧（編集）</h2>
-      <div id="programEditor" class="program-editor"></div>
-      <h3>JSON（手動編集可）</h3>
-      <textarea id="jsonInput" spellcheck="false"></textarea>
-    </aside>
-  </main>
-
   <script src="app.js" defer></script>
+</head>
+
+<body>
+  <div id="wrapper">
+    <div id="mainClockPane">
+      <div id="mainClockBox">
+        <div id="mainClockName">プログラム名称</div>
+        <div id="mainClockTimer">00:00:00</div>
+      </div>
+    </div>
+
+    <div id="timelinePane">
+      <div id="timeLineBox">
+        <div id="bars"></div>
+      </div>
+    </div>
+
+    <div id="controlPane">
+      <div class="control-row">
+        <button id="playBtn" class="btn">開始</button>
+        <button id="pauseBtn" class="btn">一時停止</button>
+        <button id="stepBtn" class="btn">次へ</button>
+      </div>
+    </div>
+
+
+    <div id="programEditorPane">
+      <h2>プログラム一覧（編集）</h2>
+      <div id="programEditor"></div>
+      <h2>設定</h2>
+      <div id="settings">
+        <label>総時間（秒） <input id="totalTime" type="number" value="3600" /></label>
+        <button id="applyBtn" class="btn">調整を実行</button>
+        <button id="resetBtn" class="btn">サンプル読込</button>
+      </div>
+      <h2>JSON（手動編集可）</h2>
+      <textarea id="jsonInput" spellcheck="false"></textarea>
+    </div>
+  </div>
 </body>
+
 </html>

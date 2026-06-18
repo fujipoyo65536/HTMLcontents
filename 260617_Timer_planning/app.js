@@ -12,11 +12,9 @@ const $ = id => document.getElementById(id);
 const jsonInput = $('jsonInput');
 const totalTimeInput = $('totalTime');
 const bars = $('bars');
-const progList = $('progList');
 const programEditor = $('programEditor');
-const bigTotal = $('bigTotal');
-const currentName = $('currentName');
-const currentRemain = $('currentRemain');
+const mainClockName = $('mainClockName');
+const mainClockTimer = $('mainClockTimer');
 
 let data = null;
 
@@ -29,7 +27,8 @@ function loadSample(){
 function render(){
   if(!data) return;
   renderBars();
-  renderList();
+  renderProgramEditor();
+  updateMainClockDisplay();
 }
 
 function renderBars(){
@@ -47,14 +46,8 @@ function renderBars(){
   }
 }
 
-function renderList(){
-  progList.innerHTML = '';
-  for(const p of data.programs){
-    const li = document.createElement('li');
-    li.innerHTML = `<span>${p.name} <span class="small">(${p.baseline}s)</span></span><span>${Math.round(p.current_time)}s</span>`;
-    progList.appendChild(li);
-  }
-}
+// prog list removed — editor table is authoritative
+
 
 function renderProgramEditor(){
   programEditor.innerHTML = '';
@@ -99,16 +92,31 @@ function syncUIFromData(updateJson=true){
   // ensure current_time exists
   for(const p of data.programs) if(typeof p.current_time==='undefined') p.current_time = p.baseline;
   totalTimeInput.value = data.totalTime || sample.totalTime;
-  bigTotal.textContent = `${totalTimeInput.value}s`;
-  renderBars(); renderList(); renderProgramEditor();
-  // current program
-  const cur = data.programs.find(p=>p.current_time>0) || null;
-  if(cur){ currentName.textContent = cur.name; currentRemain.textContent = `${Math.round(cur.current_time)}s`; } else { currentName.textContent='現在'; currentRemain.textContent='—'; }
+  renderBars(); renderProgramEditor();
+  updateMainClockDisplay();
   if(updateJson) jsonInput.value = JSON.stringify(data, null, 2);
 }
 
 function updateDataFromJson(){
   try{ const d = JSON.parse(jsonInput.value); data = d; for(const p of data.programs) p.current_time = p.baseline; syncUIFromData(false); }catch(e){ alert('JSONが不正です'); }
+}
+
+function formatTime(sec){
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec/3600); const m = Math.floor((sec%3600)/60); const s = sec%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateMainClockDisplay(){
+  if(!data) return;
+  const cur = data.programs.find(p=>p.current_time>0) || null;
+  if(cur){
+    if(mainClockName) mainClockName.textContent = cur.name;
+    if(mainClockTimer) mainClockTimer.textContent = formatTime(cur.current_time);
+  } else {
+    if(mainClockName) mainClockName.textContent = '';
+    if(mainClockTimer) mainClockTimer.textContent = '00:00:00';
+  }
 }
 
 function colorFor(p){
