@@ -22,7 +22,7 @@ body {
   color: var(--text);
 }
 
-/* layout grid: left = display, right = sidebar */
+/* レイアウトグリッド: 左=表示部、右=サイドバー */
 #wrapper {
   padding: 16px;
   display: grid;
@@ -37,7 +37,7 @@ body {
 }
 
 
-/* ---------- main clock box ---------- */
+/* ---------- メイン時計ボックス ---------- */
 #mainClockPane {
   grid-area: mainClockPane
 }
@@ -55,7 +55,7 @@ body {
 }
 
 #mainClockName {
-  /* keep name small but readable */
+  /* 名称は小さめだが読みやすく */
   font-size: clamp(14px, 20vh, 5vw);
   line-height: 1;
   margin-bottom: 6px;
@@ -69,18 +69,19 @@ body {
   font-size: clamp(32px, 50vh, 15vw);
 }
 
-/* ---------- time line pane ---------- */
+/* ---------- タイムライン領域 ---------- */
 
 #timelinePane {
   grid-area: timelinePane
 }
 
 
-#timeLineBox{
+#timeLineBox {
   display: flex;
   flex-direction: column;
-  /* gap: 8px */
+  /* ギャップ: 8px */
 }
+
 
 #bars {
   display: flex;
@@ -93,7 +94,6 @@ body {
 .bar {
   height: 100%;
   display: flex;
-  align-items: center;
   padding: 8px;
   color: var(--bg);
   background: var(--text);
@@ -101,7 +101,37 @@ body {
   font-size: 14px;
   border: 1px solid #000;
   border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06)
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.bar-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bg);
+  margin-bottom: 4px
+}
+
+.bar-times {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--bg)
+}
+
+.bar-times .bar-diff.pos {
+  color: #8ef08e
+}
+
+.bar-times .bar-diff.neg {
+  color: #f08e8e
+}
+
+.bar-times .bar-diff.zero {
+  color: var(--bg)
 }
 
 
@@ -138,8 +168,8 @@ body {
   padding: 12px;
 }
 
-/* inputs inside program editor should blend with background
-   include inputs without explicit type attribute (defaults to text) */
+/* プログラム編集内の入力は背景に馴染ませる
+  type属性未指定の入力も含む（デフォルトはtext） */
 #programEditorPane input,
 #programEditorPane select,
 #programEditorPane textarea {
@@ -156,30 +186,32 @@ body {
   font: inherit;
 }
 
-/* remove number input spinners for cleaner look */
+/* 見た目をすっきりさせるため number 入力のスピナーを非表示 */
 #programEditorPane input[type="number"]::-webkit-outer-spin-button,
 #programEditorPane input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 #programEditorPane input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* style select to blend and show a clean custom arrow */
+/* select を背景に馴染ませ、控えめなカスタム矢印を表示 */
 #programEditorPane select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   background-color: transparent;
   color: inherit;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--highlight1);
   border-radius: 4px;
-  padding-right: 28px; /* space for arrow */
+  padding-right: 28px;
+  /* space for arrow */
   position: relative;
 }
 
-/* add a subtle CSS arrow using background gradients */
+/* 背景のグラデーションで控えめな矢印を追加 */
 #programEditorPane select {
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: calc(100% - 14px) calc(50% - 6px), calc(100% - 8px) calc(50% - 6px);
@@ -187,15 +219,50 @@ body {
   background-repeat: no-repeat;
 }
 
-/* options: match dark background and readable text */
+/* option: 暗背景に合わせて可読性を確保 */
 #programEditorPane option {
   background: var(--bg);
   color: var(--text);
   padding: 6px 8px;
 }
 
-/* focus state for accessibility */
+/* フォーカス時のアクセシビリティ用スタイル */
 #programEditorPane select:focus {
-  border-color: rgba(255,255,255,0.16);
-  box-shadow: 0 0 0 3px rgba(7,39,77,0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 3px rgba(7, 39, 77, 0.12);
+}
+
+.programTable th:nth-child(1),
+.programTable td:nth-child(1) {
+  width: 120px;
+}
+
+.programTable th:nth-child(2),
+.programTable td:nth-child(2) {
+  width: 80px;
+}
+
+.programTable th:nth-child(3),
+.programTable td:nth-child(3) {
+  width: 80px;
+}
+
+.programTable th:nth-child(4),
+.programTable td:nth-child(4) {
+  width: 80px;
+}
+
+.programTable th:nth-child(5),
+.programTable td:nth-child(5) {
+  width: 50px;
+}
+
+.programTable th:nth-child(6),
+.programTable td:nth-child(6) { 
+  width: 50px;
+}
+
+.programTable th:nth-child(7),
+.programTable td:nth-child(7) { 
+  width: 50px;
 }
