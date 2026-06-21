@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>会議タイマー プロトタイプ</title>
+  <title>SmartTimeBalancer — 会議タイマー（プロトタイプ）</title>
   <link rel="stylesheet" href="style.css" />
   <script src="app.js" defer></script>
 </head>
@@ -20,7 +20,25 @@
 
     <div id="timelinePane">
       <div id="timeLineBox">
-        <div id="bars"></div>
+        <div id="bars">
+
+          <!-- テンプレート: タイムラインのバー -->
+          <template id="bar-template">
+            <div class="bar">
+              <div class="bar-name"></div>
+              <div class="bar-times">
+                <div>
+                  <span class="bar-counted"></span> / <span class="bar-assigned">88:88:88</span>
+                </div>
+                <div>
+                  (<span class="bar-baseline">88:88:88</span>
+                  <span class="bar-diff">+88:88</span>)
+                </div>
+              </div>
+            </div>
+          </template>
+
+        </div>
       </div>
     </div>
 
@@ -36,6 +54,20 @@
     <div id="programEditorPane">
       <h2>プログラム一覧（編集）</h2>
       <div id="programEditor"></div>
+
+      <!-- テンプレート: プログラム一覧の行 -->
+      <template id="program-row-template">
+        <tr>
+          <td class="namecol"><input data-field="name" value=""></td>
+          <td><input class="time-input" data-field="baseline" type="text" value=""></td>
+          <td><input class="time-input" data-field="min" type="text" value=""></td>
+          <td><input class="time-input" data-field="max" type="text" value=""></td>
+          <td><select data-field="dontShrinkPriority"></select></td>
+          <td><select data-field="skipPriority"></select></td>
+          <td><select data-field="extendPriority"></select></td>
+        </tr>
+      </template>
+
       <h2>設定</h2>
       <div id="settings">
         <label>総時間 <input id="totalTime" type="text" value="3600" /></label>

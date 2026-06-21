@@ -86,7 +86,7 @@ body {
 #bars {
   display: flex;
   align-items: center;
-  height: 64px;
+  height: 100px;
   overflow: hidden;
   padding: 6px
 }
@@ -115,11 +115,11 @@ body {
 }
 
 .bar-times {
-  display: flex;
+  /* display: flex;
   gap: 8px;
   align-items: center;
   font-size: 12px;
-  color: var(--bg)
+  color: var(--bg) */
 }
 
 .bar-times .bar-diff.pos {
