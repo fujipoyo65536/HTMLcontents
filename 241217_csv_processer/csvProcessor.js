@@ -1135,10 +1135,11 @@ const csvProcessor = {
 		// writeableStreamを取得(ファイルがない場合は作成)
 		const writeableStream = await csvProcessor.getWriteableStream(outputFileFullName);
 		// 出力ファイルに書き込み
-		if( 
+		if(
 			(csvProcessor.options.outputWritingTiming == "100" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 100) ||
 			(csvProcessor.options.outputWritingTiming == "1000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 1000) ||
-			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 10000)
+			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 10000) ||
+			(csvProcessor.options.outputWritingTiming == "100000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 100000)
 		){
 			await csvProcessor.writeToFile(outputFileFullName,last);
 		}
