@@ -135,7 +135,11 @@ document.addEventListener('DOMContentLoaded', function() {
 	inputElements.forEach(function(element) {
 		element.addEventListener('input', function(){
 			// inputEncodingSelectに変更があった場合はファイルをリロードする
-			if(element.id == 'inputEncodingSelect'){
+			// ただし「直接入力」の場合は入力テキストが既にJS文字列(デコード済み)であり
+			// 文字コード変換の対象にならないため、ファイル/フォルダ入力時のみリロードする
+			const checkedInputMethod = document.querySelector('input[name="inputMethod"]:checked');
+			const selectedInputMethod = checkedInputMethod ? checkedInputMethod.value : null;
+			if(element.id == 'inputEncodingSelect' && (selectedInputMethod == 'file' || selectedInputMethod == 'directory')){
 				csvProcessor.loadAndUpdatePreview();
 			}else{
 				csvProcessor.updatePreview();
@@ -156,22 +160,26 @@ document.addEventListener('DOMContentLoaded', function() {
 				document.getElementById('inputFileRegExpInput').disabled = true;
 				document.getElementById('directoryReloadButton').disabled = true;
 				document.getElementById('inputCsvTextInput').disabled = true;
+				document.getElementById('inputEncodingSelect').disabled = false;
 				break;
-				
+
 				case 'directory':
 				document.getElementById('selectFileButton').disabled = true;
 				document.getElementById('inputDirectorySelectButton').disabled = false;
 				document.getElementById('inputFileRegExpInput').disabled = false;
 				document.getElementById('directoryReloadButton').disabled = false;
 				document.getElementById('inputCsvTextInput').disabled = true;
+				document.getElementById('inputEncodingSelect').disabled = false;
 				break;
-				
+
 				case 'direct':
 				document.getElementById('selectFileButton').disabled = true;
 				document.getElementById('inputDirectorySelectButton').disabled = true;
 				document.getElementById('inputFileRegExpInput').disabled = true;
 				document.getElementById('directoryReloadButton').disabled = true;
 				document.getElementById('inputCsvTextInput').disabled = false;
+				// 直接入力はJS文字列(デコード済み)のため、入力文字コードの選択は無意味 → 無効化して固定扱いにする
+				document.getElementById('inputEncodingSelect').disabled = true;
 				break;
 			}
 		});
@@ -284,6 +292,11 @@ const csvProcessor = {
 	},
 	
 	loadAndUpdatePreview: async()=>{
+		// ファイルが1件も無い場合(未選択 or 検索結果0件)は、プレビュー再読込をせず終了
+		if(!csvProcessor.inputFiles || csvProcessor.inputFiles.length == 0 || !csvProcessor.inputFiles[0].fileObj){
+			csvProcessor.updatePreview();
+			return;
+		}
 		// 1ファイル目をプレビュー
 		const options = csvProcessor.getOptionsFromHtml();
 		const file = csvProcessor.inputFiles[0].fileObj;
