@@ -1407,6 +1407,10 @@ const csvProcessor = {
 		
 		let lineBreakRegExp;
 		let lineBreak;
+		// 呼び出し元は、inputLineBreakSelectが"CUSTOM"の場合、ここには"CUSTOM"という文字列ではなく
+		// カスタム改行文字そのもの(inputLineBreakCustom)を渡してくる。そのためここでのCUSTOM判定は
+		// 「既知のキーワードのいずれにも一致しない」ことで行う。
+		const knownLineBreakKeys = ['ALL','LF','CR','CRLF'];
 		switch(options.lineBreakSelect){
 			case 'ALL':
 				lineBreakRegExp = /[\r\n|\r|\n]/;
@@ -1424,17 +1428,13 @@ const csvProcessor = {
 				lineBreakRegExp = /\r\n/;
 				lineBreak = '\r\n';
 				break;
-			case 'CUSTOM':
-				lineBreakRegExp = new RegExp(options.lineBreakSelect);
-				lineBreak = options.lineBreakSelect;
-				break;
 			default:
-				lineBreakRegExp = /\n/;
-				lineBreak = '\n';
+				// カスタム改行文字(空の場合はLF扱い)
+				lineBreak = options.lineBreakSelect || '\n';
 				break;
 		}
-		
-		// 今後の処理で、改行コードが2文字だと支障があるので、LFに統一
+
+		// 今後の処理で、改行コードが2文字以上だと支障があるので、LFに統一
 		// ★データ(ダブルクォーテーション)内の改行もあわせて置換してしまうが、そういう仕様として扱う
 		let tmpArray = [];
 		if(options.lineBreakSelect == "ALL"){
@@ -1472,8 +1472,28 @@ const csvProcessor = {
 				}
 			}
 			csvTextArray = tmpArray;
+		}else if(options.lineBreakSelect && !knownLineBreakKeys.includes(options.lineBreakSelect)){
+			// カスタム改行文字(複数文字も許容)を検出し、LFに一括置換
+			const customBreak = options.lineBreakSelect;
+			for( let i = 0; i < csvTextArray.length; i++){
+				let isMatch = true;
+				for(let k = 0; k < customBreak.length; k++){
+					if(csvTextArray[i+k] != customBreak[k]){
+						isMatch = false;
+						break;
+					}
+				}
+				if(isMatch){
+					// カスタム改行文字はLFに変換
+					tmpArray.push('\n');
+					i += customBreak.length - 1;
+				}else{
+					tmpArray.push(csvTextArray[i]);
+				}
+			}
+			csvTextArray = tmpArray;
 		}
-		
+
 		
 		//入力末尾の改行を消す
 		if(options.ignoreLastLineBreak && options.last){
