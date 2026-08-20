@@ -1980,7 +1980,7 @@ const csvProcessor = {
 					cellArray = [];
 					i++;
 				}else{
-					cellArray = textArray[i];
+					cellArray.push(textArray[i]);
 				}
 			}
 		}
