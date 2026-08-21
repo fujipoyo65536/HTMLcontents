@@ -1412,11 +1412,13 @@ const csvProcessor = {
 		// csvTextInputは文字列か、1文字ずつの配列(中身は文字)
 		
 		// ここからしばらく、入力は配列として扱う
+		// 配列で渡された場合、呼び出し元の配列(ストリーム処理のcsvBuffer等)を破壊的に
+		// 変更してしまわないよう、必ずコピーを作ってから扱う
 		let csvTextArray = [];
 		if (typeof csvTextInput === 'string') {
 			csvTextArray = csvTextInput.split('')
 		} else if (Array.isArray(csvTextInput)) {
-			csvTextArray = csvTextInput;
+			csvTextArray = [...csvTextInput];
 		}
 		
 		let lineBreakRegExp;
