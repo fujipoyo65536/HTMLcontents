@@ -311,7 +311,8 @@ width: calc(80% - 10px);
 #perInputProcessTab>div,
 #perRowProcessTab>div,
 #perCellProcessTab>div,
-#perOutputProcessTab>div{
+#perOutputProcessTab>div,
+#outputFileNameProcessTab>div{
   height: 100%;
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -321,7 +322,8 @@ width: calc(80% - 10px);
 #perInputProcessTab .codeMirrorBox,
 #perRowProcessTab .codeMirrorBox,
 #perCellProcessTab .codeMirrorBox,
-#perOutputProcessTab .codeMirrorBox{
+#perOutputProcessTab .codeMirrorBox,
+#outputFileNameProcessTab .codeMirrorBox{
   /* height: calc(100% - 100px);
   max-height: calc(100% - 100px); */
   position: relative;
@@ -332,7 +334,8 @@ width: calc(80% - 10px);
 #perInputProcessTab .CodeMirror,
 #perRowProcessTab .CodeMirror,
 #perCellProcessTab .CodeMirror,
-#perOutputProcessTab .CodeMirror{
+#perOutputProcessTab .CodeMirror,
+#outputFileNameProcessTab .CodeMirror{
   height: 100%;
   max-height: 100%;
   overflow: hidden;

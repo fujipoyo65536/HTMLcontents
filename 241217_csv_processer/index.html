@@ -313,18 +313,6 @@
 								</td>
 							</tr>
 							<tr>
-								<th>ファイル名<br>(振分・抽出)</th>
-								<td>
-									<textarea id="outputFileNameCodeInput" rows="2" cols="50" placeholder="出力ファイル名を返すコードを入力"
-										data-option="outputFileNameCode">return ["output.csv"]</textarea>
-									<div class="tooltip">？<div class="tooltipText">
-											配列を返すことで、出力先ファイル名を指定できます（複数指定すると同じ行を複数ファイルへ振分・複製）。<br>
-											ここで使える変数：file, fileObj, csvIndex, csvArray, rowIndex, rowArray, rowText, options, sessionRowCount
-										</div>
-									</div>
-								</td>
-							</tr>
-							<tr>
 								<th>ファイル分割<div class="tooltip">！<div class="tooltipText">未対応(将来対応予定)</div></th>
 																<td>
 									<input type="checkbox" id="outputSplitCheckbox" data-option="outputSplit" disabled>ファイルを指定行数ごとに分割する<br>
@@ -355,6 +343,7 @@
 					<div class="tab" data-tab="perRowProcess">行ごとの処理</div>
 					<div class="tab" data-tab="perCellProcess">セルごとの処理</div>
 					<div class="tab" data-tab="perOutputProcess">書込ごとの処理</div>
+					<div class="tab" data-tab="outputFileNameProcess">出力ファイル名</div>
 					<div class="paneTitle">Process</div>
 					<div class="tab" data-tab="processingStatus">処理状況</div>
 				</div>
@@ -434,6 +423,30 @@
 								<div class="paneTitle">ここで使える変数</div>
 								<table>
 									<tr><th>rowArrays</th><td>書き込み予定のデータ(2次元)</td></tr>
+								</table>
+							</div>
+						</div>
+					</div>
+					<div id="outputFileNameProcessTab" class="tabContent">
+						<div>
+							<div class="subPane">
+								<div class="codeMirrorBox">
+									<textarea class="code" id="outputFileNameCodeInput">return ["output.csv"]</textarea>
+								</div>
+								<p>配列を返すことで、出力先ファイル名を指定できます（複数指定すると同じ行を複数ファイルへ振分・複製）</p>
+							</div>
+							<div class="subPane">
+								<div class="paneTitle">ここで使える変数</div>
+								<table>
+									<tr><th>file</th><td></td></tr>
+									<tr><th>fileObj</th><td>Fileオブジェクト</td></tr>
+									<tr><th>csvIndex</th><td>入力ファイルのインデックス(何番目か)</td></tr>
+									<tr><th>csvArray</th><td>入力ファイルをCSVとしてパースした結果のオブジェクト</td></tr>
+									<tr><th>rowIndex</th><td>行インデックス(何行目か) チャンク分割を考慮</td></tr>
+									<tr><th>rowArray</th><td>行のオブジェクト(セルごと)</td></tr>
+									<tr><th>rowText</th><td>行のテキスト</td></tr>
+									<tr><th>options</th><td>現在の各設定値</td></tr>
+									<tr><th>sessionRowCount</th><td>セッション内の累計読込行数(最初の行は0)</td></tr>
 								</table>
 							</div>
 						</div>

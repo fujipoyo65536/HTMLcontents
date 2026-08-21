@@ -94,6 +94,17 @@ document.addEventListener('DOMContentLoaded', function() {
 			pasteLinesPerSelection: true,
 		});
 		csvProcessor.editors.perOutputCode.setValue('//example\n//return [];\n');
+
+		csvProcessor.editors.outputFileNameCode = CodeMirror.fromTextArea(document.getElementById('outputFileNameCodeInput'), {
+			lineNumbers: true,
+			mode: "javascript",
+			theme: "default",
+			lineWrapping: true,
+			showCursorWhenSelecting: true,
+			lineWiseCopyCut: true,
+			pasteLinesPerSelection: true,
+		});
+		csvProcessor.editors.outputFileNameCode.setValue('return ["output.csv"]');
 	}
 
 	
@@ -236,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	const outputButton = document.getElementById('outputButton');
 	outputButton.addEventListener('click', async function(){
 		// csvProcessor.processAll();
-		document.querySelectorAll('#codePaneTabBox>.tab')[4].click();
+		document.querySelectorAll('#codePaneTabBox>.tab')[5].click();
 		csvProcessor.processAllStream();
 	});
 	
@@ -794,7 +805,7 @@ const csvProcessor = {
 			}
 
 			// 出力ファイル名を設定する処理
-			let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode,csvProcessor.userFuncVars.outputFileName);
+			let outputFileNameFunc = csvProcessor.makeUserFunc(csvProcessor.editors.outputFileNameCode.getValue(),csvProcessor.userFuncVars.outputFileName);
 			if(typeof outputFileNameFunc === 'function'){
 				csvProcessor.outputFileNameFunc = outputFileNameFunc;
 				csvProcessor.outputFileNameFuncFlag = true;
@@ -1822,6 +1833,7 @@ const csvProcessor = {
 			perRowCode: csvProcessor.editors.perRowCode.getValue(),
 			perCellCode: csvProcessor.editors.perCellCode.getValue(),
 			perOutputCode: csvProcessor.editors.perOutputCode.getValue(),
+			outputFileNameCode: csvProcessor.editors.outputFileNameCode.getValue(),
 		};
 		let profileText = JSON.stringify(profile);
 		let blob = new Blob([profileText], {type: 'application/json'});
@@ -1855,7 +1867,9 @@ const csvProcessor = {
 				codePaneTabs[2].click();
 				csvProcessor.editors.perCellCode.setValue(profile.perCellCode);
 				codePaneTabs[3].click();
-				csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);		
+				csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);
+				codePaneTabs[4].click();
+				csvProcessor.editors.outputFileNameCode.setValue(profile.outputFileNameCode);
 				codePaneTabs[2].click();
 			};
 			reader.readAsText(file);
@@ -1873,6 +1887,7 @@ const csvProcessor = {
 			perRowCode: csvProcessor.editors.perRowCode.getValue(),
 			perCellCode: csvProcessor.editors.perCellCode.getValue(),
 			perOutputCode: csvProcessor.editors.perOutputCode.getValue(),
+			outputFileNameCode: csvProcessor.editors.outputFileNameCode.getValue(),
 		};
 		// localStorage対応チェック
 		if (typeof localStorage === 'undefined') {
@@ -1926,7 +1941,9 @@ const csvProcessor = {
 			codePaneTabs[2].click();
 			csvProcessor.editors.perCellCode.setValue(profile.perCellCode);
 			codePaneTabs[3].click();
-			csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);		
+			csvProcessor.editors.perOutputCode.setValue(profile.perOutputCode);
+			codePaneTabs[4].click();
+			csvProcessor.editors.outputFileNameCode.setValue(profile.outputFileNameCode);
 			codePaneTabs[2].click();
 
 		}
