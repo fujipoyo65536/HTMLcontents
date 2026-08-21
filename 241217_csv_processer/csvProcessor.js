@@ -750,7 +750,7 @@ const csvProcessor = {
 		{
 			// 入力ファイルごとに実行する処理
 			
-			let perInputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perInputCode.getValue());
+			let perInputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perInputCode.getValue(),csvProcessor.userFuncVars.perInput);
 			if(typeof perInputFunc === 'function'){
 				csvProcessor.perInputFunc = perInputFunc;
 				csvProcessor.perInputFuncFlag = true;
@@ -761,7 +761,7 @@ const csvProcessor = {
 			}
 			
 			// 行ごとに実行する処理
-			let perRowFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perRowCode.getValue());
+			let perRowFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perRowCode.getValue(),csvProcessor.userFuncVars.perRow);
 			if(typeof perRowFunc === 'function'){
 				csvProcessor.perRowFunc = perRowFunc;
 				csvProcessor.perRowFuncFlag = true;
@@ -772,7 +772,7 @@ const csvProcessor = {
 			}
 			
 			// セルごとに実行する処理
-			let perCellFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perCellCode.getValue());
+			let perCellFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perCellCode.getValue(),csvProcessor.userFuncVars.perCell);
 			if(typeof perCellFunc === 'function'){
 				csvProcessor.perCellFunc = perCellFunc;
 				csvProcessor.perCellFuncFlag = true;
@@ -783,7 +783,7 @@ const csvProcessor = {
 			}
 			
 			// 出力ファイルごとに実行する処理
-			let perOutputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perOutputCode.getValue());
+			let perOutputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perOutputCode.getValue(),csvProcessor.userFuncVars.perOutput);
 			if(typeof perOutputFunc === 'function'){
 				csvProcessor.perOutputFunc = perOutputFunc;
 				csvProcessor.perOutputFuncFlag = true;
@@ -792,9 +792,9 @@ const csvProcessor = {
 				console.log("出力ファイルごとに実行する処理は定義されませんでした",perOutputFunc);
 				csvProcessor.perOutputFuncFlag = false;
 			}
-			
+
 			// 出力ファイル名を設定する処理
-			let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode);
+			let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode,csvProcessor.userFuncVars.outputFileName);
 			if(typeof outputFileNameFunc === 'function'){
 				csvProcessor.outputFileNameFunc = outputFileNameFunc;
 				csvProcessor.outputFileNameFuncFlag = true;
@@ -1280,11 +1280,23 @@ const csvProcessor = {
 		}
 	},
 	
-	makeUserFunc: (userCode)=>{
+	// 「ここで使える変数」として画面に案内している名前を、そのまま裸の変数名で使えるようにするための
+	// 分割代入の一覧。第1引数(a)経由の`a.xxx`でのアクセスも従来通り可能(こちらは後方互換のため残す)。
+	userFuncVars: {
+		perInput: ['file','fileObj','csvIndex','csvText','csvArray','rowTextArray','options','allLoaded','completed','firstLoad','sessionRowCount'],
+		perRow: ['rowIndex','rowArray','rowText'],
+		perCell: ['cellIndex','cellText'],
+		perOutput: ['rowArrays'],
+		outputFileName: ['file','fileObj','csvIndex','csvArray','rowIndex','rowArray','rowText','options','sessionRowCount'],
+	},
+
+	makeUserFunc: (userCode,varNames=[])=>{
 		if(!userCode || userCode == ""){
 			return "userFunc is empty";
 		}
-		let code= `try{\n${userCode}\n}catch(e){console.log("userFunc failed:",e.message);console.error(e);}`;
+		// varに続き、コード内でuserCode側がvar宣言をしても衝突でエラーにならないようvarで統一
+		const destructureLine = varNames.length > 0 ? `var {${varNames.join(',')}} = a;\n` : '';
+		let code= `${destructureLine}try{\n${userCode}\n}catch(e){console.log("userFunc failed:",e.message);console.error(e);}`;
 		let returnFunc;
 		try{
 			returnFunc = new Function("a,m,f",code);

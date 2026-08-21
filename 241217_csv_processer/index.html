@@ -317,6 +317,11 @@
 								<td>
 									<textarea id="outputFileNameCodeInput" rows="2" cols="50" placeholder="出力ファイル名を返すコードを入力"
 										data-option="outputFileNameCode">return ["output.csv"]</textarea>
+									<div class="tooltip">？<div class="tooltipText">
+											配列を返すことで、出力先ファイル名を指定できます（複数指定すると同じ行を複数ファイルへ振分・複製）。<br>
+											ここで使える変数：file, fileObj, csvIndex, csvArray, rowIndex, rowArray, rowText, options, sessionRowCount
+										</div>
+									</div>
 								</td>
 							</tr>
 							<tr>
@@ -361,7 +366,7 @@
 									<textarea class="code" data-processOption="perInputCode" data-option="perInputCode"
 										id="perInputCode">//example</textarea>
 								</div>
-								<p>配列を返すことで、入力データ(a.csvArray)を書き換え、以後の処理結果を変えることが可能</p>
+								<p>配列を返すことで、入力データ(csvArray)を書き換え、以後の処理結果を変えることが可能</p>
 							</div>
 							<div class="subPane">
 								<div class="paneTitle">ここで使える変数</div>
