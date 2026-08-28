@@ -893,6 +893,10 @@ const csvProcessor = {
 				readingBuffer = new Uint8Array([...readingBuffer, ...value]);
 				// 文字列配列として切り出せた部分と余り(文字列として成立しなかった部分)
 				let [textArray,rest] = csvProcessor.uInt8ArrayToTextArray(readingBuffer,csvProcessor.options.inputEncoding,done);
+				// ファイル先頭にBOM(U+FEFF)が残っていた場合は取り除く(文字コードによらず一律)
+				if(firstLoad && textArray[0] == '﻿'){
+					textArray.shift();
+				}
 				// 余りを次の読み込みに持ち越す
 				readingBuffer = rest;
 				csvBuffer = [...csvBuffer,...textArray];
@@ -1130,6 +1134,10 @@ const csvProcessor = {
 			csvProcessor.addLogText("output",`ファイル作成完了: ${outputFileFullName}`);
 			csvProcessor.outputFiles[outputFileFullName].writeableStream = writeableStream;
 			
+			// BOMを書き込み(対応する文字コードの場合のみ)
+			if(csvProcessor.options.outputAddBom && ['UTF-8','UTF16BE','UTF16LE'].includes(csvProcessor.options.outputEncoding)){
+				tmpOutputText += '﻿';
+			}
 			// prefixを書き込み
 			if(csvProcessor.options.outputPrefixText!=""){
 				tmpOutputText += csvProcessor.options.outputPrefixText

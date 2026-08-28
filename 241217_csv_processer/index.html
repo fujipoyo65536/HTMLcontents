@@ -236,6 +236,13 @@
 										<option value="UTF16BE">UTF-16be</option>
 										<option value="UTF16LE">UTF-16le</option>
 									</select>
+									<label><input type="checkbox" id="outputAddBomCheckbox" data-option="outputAddBom">BOMを付与する</label>
+									<div class="tooltip">？<div class="tooltipText">
+											UTF-8 / UTF-16be / UTF-16le の場合のみ有効です。<br>
+											Excel等でUTF-8のCSVを直接開いたときの文字化け対策に使えます。<br>
+											Shift_JIS / EUC-JP / ISO-2022-JPを選択している場合はチェックしても無視されます。
+										</div>
+									</div>
 								</td>
 							</tr>
 							<tr>
