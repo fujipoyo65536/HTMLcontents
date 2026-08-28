@@ -179,18 +179,25 @@
 								<th>セル内の<br>特殊文字</th>
 								<td>
 									<label><input type="checkbox" id="inputIsUsingLineBreakInWrapperCheckbox"
-											data-option="inputIsUsingLineBreakInWrapper">セル内に改行文字を含む</label><br>
+											data-option="inputIsUsingLineBreakInWrapper">セル内に改行文字を含む</label>
+									<div class="tooltip">？<div class="tooltipText">
+											全体を1文字ずつ解析する低速な処理になります。<br>必要な場合のみチェックしてください。
+										</div>
+									</div>
+									<br>
 									<label><input type="checkbox" id="inputIsUsingDelimiterInWrapperCheckbox"
 											data-option="inputIsUsingDelimiterInWrapper">セル内に区切り文字を含む</label>
 									<div class="tooltip">？<div class="tooltipText">
-											読み込みに必要な時間が大幅に増加します。<br>必要な場合のみチェックしてください。
+											本来は行ごとに一括分割してから解析する高速な処理を想定していますが、現状未実装のため、<br>
+											「セル内に改行文字を含む」と同じ、全体を1文字ずつ解析する低速な処理にフォールバックしています（当面この仕様で運用）。<br>
+											必要な場合のみチェックしてください。
 										</div>
 									</div>
 									<br>
 									<label><input type="checkbox" id="inputIsUsingWrapperInWrapperCheckbox" checked
 											data-option="inputIsUsingWrapperInWrapper">セル内に囲み文字を含む</label>
 									<div class="tooltip">？<div class="tooltipText">
-											読み込みに必要な時間が大幅に増加します。<br>必要な場合のみチェックしてください。
+											この項目は処理速度にほとんど影響しません。
 										</div>
 									</div>
 								</td>
