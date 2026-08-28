@@ -947,7 +947,7 @@ const csvProcessor = {
 							allLoaded,
 							completed,
 							firstLoad,
-							csvProcessor, //★メモリリークするなら入れない
+							csvProcessor, // 裏機能：内部オブジェクトへの参照（意図的に非公開）
 							sessionRowCount : csvProcessor.inputRowCount,
 						},csvProcessor.sessionMemory);
 						if (Array.isArray(tmp)) {
@@ -987,7 +987,7 @@ const csvProcessor = {
 								allLoaded,
 								completed,
 								firstLoad,
-								csvProcessor, //★メモリリークするなら入れない
+								csvProcessor, // 裏機能：内部オブジェクトへの参照（意図的に非公開）
 								sessionRowCount : csvProcessor.inputRowCount,
 								
 								rowIndex: loadedRowNumber+rowIndex,
@@ -1019,7 +1019,7 @@ const csvProcessor = {
 									allLoaded,
 									completed,
 									firstLoad,
-									csvProcessor, //★メモリリークするなら入れない
+									csvProcessor, // 裏機能：内部オブジェクトへの参照（意図的に非公開）
 									sessionRowCount : csvProcessor.inputRowCount,
 									
 									rowIndex: loadedRowNumber+rowIndex,
@@ -1199,7 +1199,7 @@ const csvProcessor = {
 				let tmp = csvProcessor.perOutputFunc({
 					rowArrays,
 					options,
-					// csvProcessor
+					csvProcessor, // 裏機能：内部オブジェクトへの参照（意図的に非公開）
 				},csvProcessor.sessionMemory);
 				if (Array.isArray(tmp)) {
 					// csvArray[rowIndex] = tmp;
