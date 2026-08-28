@@ -298,10 +298,6 @@ const csvProcessor = {
 	inputFiles: {},
 	outputFiles: {},
 	
-	settings:{
-		outputBufferSize : 20_000_000, // 20M
-	},
-	
 	loadAndUpdatePreview: async()=>{
 		// ファイルが1件も無い場合(未選択 or 検索結果0件)は、プレビュー再読込をせず終了
 		if(!csvProcessor.inputFiles || csvProcessor.inputFiles.length == 0 || !csvProcessor.inputFiles[0].fileObj){
@@ -1153,22 +1149,28 @@ const csvProcessor = {
 		return writeableStream;
 	},
 	
+	// 行数基準("100"〜"100000")と文字数基準("char_"+文字数)の2種類のフラッシュ判定に対応
+	ROW_COUNT_WRITING_TIMINGS: ['100','1000','10000','100000'],
+
 	outputToFile: async (outputFileFullName,rowArray,last=false)=>{
 		// バッファに書き込み
 		await csvProcessor.writeToBuffer(outputFileFullName,rowArray);
 		// writeableStreamを取得(ファイルがない場合は作成)
 		const writeableStream = await csvProcessor.getWriteableStream(outputFileFullName);
 		// 出力ファイルに書き込み
-		if(
-			(csvProcessor.options.outputWritingTiming == "100" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 100) ||
-			(csvProcessor.options.outputWritingTiming == "1000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 1000) ||
-			(csvProcessor.options.outputWritingTiming == "10000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 10000) ||
-			(csvProcessor.options.outputWritingTiming == "100000" && csvProcessor.outputFiles[outputFileFullName].outputBuffer.length > 100000)
-		){
+		const writingTiming = csvProcessor.options.outputWritingTiming;
+		const buffer = csvProcessor.outputFiles[outputFileFullName];
+		let shouldFlush = false;
+		if(csvProcessor.ROW_COUNT_WRITING_TIMINGS.includes(writingTiming)){
+			shouldFlush = buffer.outputBuffer.length > Number(writingTiming);
+		}else if(writingTiming && writingTiming.startsWith('char_')){
+			shouldFlush = buffer.outputBufferCharCount > Number(writingTiming.slice('char_'.length));
+		}
+		if(shouldFlush){
 			await csvProcessor.writeToFile(outputFileFullName,last);
 		}
 	},
-	
+
 	writeToBuffer: async (outputFileFullName, rowArray)=>{
 		if(!csvProcessor.outputFiles) csvProcessor.outputFiles = {};
 		if(!csvProcessor.outputFiles[outputFileFullName]){
@@ -1176,8 +1178,11 @@ const csvProcessor = {
 		}
 		if(!csvProcessor.outputFiles[outputFileFullName].outputBuffer){
 			csvProcessor.outputFiles[outputFileFullName].outputBuffer = [];
+			csvProcessor.outputFiles[outputFileFullName].outputBufferCharCount = 0;
 		}
 		csvProcessor.outputFiles[outputFileFullName].outputBuffer.push(rowArray);
+		// 文字数基準でのフラッシュ判定用に、セルの文字数を概算で積算(区切り文字・囲み文字は含まないおおよその値)
+		csvProcessor.outputFiles[outputFileFullName].outputBufferCharCount += rowArray.reduce((sum,cell)=>sum+String(cell).length,0);
 		csvProcessor.outputFiles[outputFileFullName].outputRowCount++;
 	},
 	
@@ -1230,7 +1235,8 @@ const csvProcessor = {
 			}
 		}
 		csvProcessor.outputFiles[outputFileFullName].outputBuffer = [];
-		
+		csvProcessor.outputFiles[outputFileFullName].outputBufferCharCount = 0;
+
 		const arraybuffer = csvProcessor.encodeText(outputText,csvProcessor.options.outputEncoding);
 		await writeableStream.write(arraybuffer);
 		console.log("File wrote",outputFileFullName);
