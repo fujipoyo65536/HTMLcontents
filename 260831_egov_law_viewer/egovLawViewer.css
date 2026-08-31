@@ -1,0 +1,405 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: "Yu Gothic", "Hiragino Sans", sans-serif;
+  color: #222;
+  background: #f5f5f3;
+}
+
+#appHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #1f3a5f;
+  color: #fff;
+}
+
+#appHeader h1 {
+  font-size: 16px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+#searchBox {
+  position: relative;
+  flex: 1;
+  max-width: 480px;
+}
+
+#searchInput {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#searchResults {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  color: #222;
+  border: 1px solid #ccc;
+  border-top: none;
+  max-height: 360px;
+  overflow-y: auto;
+  z-index: 50;
+  box-shadow: 0 4px 10px rgba(0,0,0,.15);
+}
+
+#searchResults .searchResultItem {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+
+#searchResults .searchResultItem:hover {
+  background: #eef3fa;
+}
+
+#searchResults .srTitle {
+  font-weight: bold;
+}
+
+#searchResults .srMeta {
+  color: #666;
+  font-size: 12px;
+}
+
+#searchResults .searchResultEmpty,
+#searchResults .searchResultError {
+  padding: 10px;
+  color: #666;
+  font-size: 13px;
+}
+
+#parserDebugLink {
+  color: #cfe0ff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#appBody {
+  display: flex;
+  height: calc(100% - 45px);
+}
+
+#tocPane {
+  width: 260px;
+  flex: none;
+  background: #fff;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+#lawHeading #lawTitleDisplay {
+  font-weight: bold;
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+#lawHeading #lawNumDisplay {
+  font-size: 12px;
+  color: #666;
+  margin: 0 0 12px;
+}
+
+#tocList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+#tocList .tocChapter > a {
+  font-weight: bold;
+}
+
+#tocList a {
+  display: block;
+  padding: 3px 4px;
+  color: #1f3a5f;
+  text-decoration: none;
+  border-radius: 3px;
+}
+
+#tocList a:hover {
+  background: #eef3fa;
+}
+
+#tocList .tocArticle {
+  padding-left: 12px;
+}
+
+#contentPane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+  background: #fff;
+  position: relative;
+}
+
+#contentLoading {
+  color: #666;
+}
+
+.lawTitle {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 0 0 8px;
+}
+
+.lawNum {
+  color: #666;
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+
+/* ツリー表示(details/summary)共通 */
+summary {
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary {
+  list-style: none;
+}
+
+summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: #888;
+  font-size: 11px;
+}
+
+details[open] > summary::before {
+  content: '▾';
+}
+
+.treeBody {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 1px solid #e3e3e0;
+}
+
+.treeNode {
+  margin: 10px 0;
+}
+
+.chapterTitle {
+  font-size: 17px;
+  font-weight: bold;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #1f3a5f;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: bold;
+  margin: 10px 0 6px;
+}
+
+.article {
+  margin: 6px 0;
+  scroll-margin-top: 12px;
+  border-radius: 4px;
+}
+
+.article:hover > summary {
+  background: #f5f7fa;
+}
+
+.articleHead {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-weight: bold;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.articleCaption {
+  color: #555;
+  font-weight: normal;
+  font-size: 13px;
+}
+
+.genericNode {
+  display: contents;
+}
+
+.paragraph {
+  margin: 6px 0 6px 4px;
+  scroll-margin-top: 12px;
+  border-radius: 4px;
+}
+
+.refHighlight {
+  animation: refFlash 2s ease-out;
+}
+
+@keyframes refFlash {
+  from { background: #fff3b0; }
+  to { background: transparent; }
+}
+
+.paragraphNum {
+  color: #888;
+  margin-right: 6px;
+}
+
+.item, .subitem {
+  margin: 4px 0 4px 1.6em;
+}
+
+.itemTitle {
+  color: #888;
+  margin-right: 6px;
+}
+
+.supplProvision {
+  margin-top: 36px;
+  padding-top: 12px;
+  border-top: 1px dashed #bbb;
+}
+
+.suppLabel {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.lawTable {
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.lawTable td, .lawTable th {
+  border: 1px solid #999;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+a.ref-explicit {
+  color: #1a5fb4;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+a.ref-explicit:hover {
+  background: #eaf1fc;
+}
+
+span.ref-delegate {
+  color: #8a5a00;
+  text-decoration: underline dashed;
+  cursor: pointer;
+}
+
+span.ref-delegate:hover {
+  background: #fff6e5;
+}
+
+#refPanel {
+  width: 420px;
+  flex: none;
+  background: #fbfbf8;
+  border-left: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+
+#refPanel[hidden] {
+  display: none;
+}
+
+#refPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ddd;
+  background: #eef1e8;
+}
+
+#refPanelTitle {
+  flex: 1;
+  font-weight: bold;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#refPanelActions {
+  display: flex;
+  gap: 6px;
+}
+
+#refPanelHeader button {
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+#refPanelBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.refCandidateList {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.refCandidateList li {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.refCandidateList li:hover {
+  background: #eef3fa;
+}
+
+.refCandidateTitle {
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.refCandidateMeta {
+  font-size: 12px;
+  color: #666;
+}
+
+.refHint {
+  font-size: 12px;
+  color: #8a5a00;
+  background: #fff8e8;
+  border: 1px solid #f0deac;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+}
+
+.refError {
+  color: #b3261e;
+}

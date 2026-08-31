@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>e-Gov法令ビューアー</title>
+<link rel="stylesheet" href="egovLawViewer.css">
+</head>
+<body>
+<header id="appHeader">
+  <h1>e-Gov法令ビューアー</h1>
+  <div id="searchBox">
+    <input type="text" id="searchInput" placeholder="法令名で検索（例：道路交通法）" autocomplete="off">
+    <div id="searchResults" hidden></div>
+  </div>
+  <a id="parserDebugLink" href="parserDebug.html">パーサー・デバッガーを開く</a>
+</header>
+
+<div id="appBody">
+  <nav id="tocPane">
+    <div id="lawHeading">
+      <p id="lawTitleDisplay">左上の検索欄から法令を検索してください</p>
+      <p id="lawNumDisplay"></p>
+    </div>
+    <ol id="tocList"></ol>
+  </nav>
+
+  <main id="contentPane">
+    <div id="contentLoading" hidden>読み込み中…</div>
+    <div id="contentBody"></div>
+  </main>
+
+  <aside id="refPanel" hidden>
+    <div id="refPanelHeader">
+      <button id="refPanelBack" title="ひとつ戻る" hidden>←戻る</button>
+      <span id="refPanelTitle"></span>
+      <div id="refPanelActions">
+        <button id="refPanelPromote">これをメインで開く</button>
+        <button id="refPanelClose">閉じる</button>
+      </div>
+    </div>
+    <div id="refPanelBody"></div>
+  </aside>
+</div>
+
+<script src="egovLawViewer.js"></script>
+</body>
+</html>

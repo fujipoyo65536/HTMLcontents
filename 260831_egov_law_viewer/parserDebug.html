@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>法令パーサー・デバッガー</title>
+<link rel="stylesheet" href="parserDebug.css">
+</head>
+<body>
+<header id="dbgHeader">
+  <h1>法令パーサー・デバッガー</h1>
+  <div id="searchBox">
+    <input type="text" id="searchInput" placeholder="法令名で検索（例：道路構造令）" autocomplete="off">
+    <div id="searchResults" hidden></div>
+  </div>
+  <a id="backToViewerLink" href="index.html">読書用ビューアに戻る</a>
+</header>
+
+<div id="dbgBody">
+  <nav id="navPane">
+    <div class="paneTitle">ナビゲータ</div>
+    <div id="lawHeading">
+      <p id="lawTitleDisplay">左上の検索欄から法令を検索してください</p>
+      <p id="lawNumDisplay"></p>
+    </div>
+    <ol id="tocList"></ol>
+  </nav>
+
+  <main id="sourcePane">
+    <div class="paneTitle">ソース</div>
+    <div id="sourceLoading" hidden>解析中…</div>
+    <div id="sourceBody"></div>
+  </main>
+
+  <aside id="inspectPane">
+    <section id="callStackPanel">
+      <div class="paneTitle">コールスタック <span id="callStackTokenLabel"></span></div>
+      <div id="callStackBody"><p class="hint">本文中のトークン（下線付きの語句）をクリックすると、解決のトレースがここに表示されます。</p></div>
+    </section>
+    <section id="scopePanel">
+      <div class="paneTitle">スコープ <span id="scopeCoordLabel"></span></div>
+      <div id="scopeBody"><p class="hint">本文をクリックすると、その位置で有効な定義済み語句が表示されます。</p></div>
+    </section>
+  </aside>
+</div>
+
+<div id="drawer" class="collapsed">
+  <div id="drawerTabs">
+    <button class="drawerTab active" data-tab="symbols">シンボルテーブル</button>
+    <button class="drawerTab" data-tab="quasi">準用・読み替え</button>
+    <button class="drawerTab" data-tab="externals">外部法令参照</button>
+    <button id="drawerToggle">▲</button>
+  </div>
+  <div id="drawerBody">
+    <div id="drawerSymbols" class="drawerPage"></div>
+    <div id="drawerQuasi" class="drawerPage" hidden></div>
+    <div id="drawerExternals" class="drawerPage" hidden></div>
+  </div>
+</div>
+
+<script src="legalParser.js"></script>
+<script src="parserDebug.js"></script>
+</body>
+</html>
