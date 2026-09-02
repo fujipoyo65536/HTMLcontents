@@ -68,9 +68,15 @@ html, body {
 #sourcePane {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border-right: 1px solid #d0d0d0;
+}
+#sourceScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 #sourceLoading { padding: 12px; color: #666; }
 #sourceBody {
@@ -78,6 +84,61 @@ html, body {
   font-family: "Cascadia Code", "Consolas", "MS Gothic", monospace;
   font-size: 13px;
   line-height: 1.9;
+}
+
+/* 定義内容ビュー: メインビュー(ソース)の下部に表示する分割ペイン。
+   何も積まれていない間は閉じておき(パネルタイトルのみ)、1段でも積まれたら開く。 */
+#defViewPane {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 3px solid #cfe0d3;
+  background: #fbfefc;
+  height: 340px;
+  transition: height .12s ease;
+}
+#defViewPane.empty {
+  height: auto;
+}
+.paneTitleHint { color: #999; font-weight: normal; font-size: 10.5px; }
+#defViewPane:not(.empty) .paneTitleHint { display: none; }
+
+#defViewStack {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+#defViewPane.empty #defViewStack { display: none; }
+
+.defViewLevel {
+  border: 1px solid #cfe0d3;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.defViewLevelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #eaf5ee;
+  padding: 5px 8px;
+  border-bottom: 1px solid #cfe0d3;
+}
+.defViewLevelDepth {
+  background: #0d6b3f; color: #fff; border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: bold;
+}
+.defViewLevelLabel { color: #0d6b3f; font-weight: bold; font-size: 11.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.defViewLevelClose {
+  border: none; background: transparent; cursor: pointer; color: #0d6b3f; font-size: 11.5px; padding: 2px 6px; border-radius: 3px;
+}
+.defViewLevelClose:hover { background: #d5ead8; }
+.defViewLevelBody {
+  padding: 8px 10px;
+  font-family: "Cascadia Code", "Consolas", "MS Gothic", monospace;
+  font-size: 13px;
+  line-height: 1.8;
 }
 
 .srcArticle { margin: 4px 0; scroll-margin-top: 10px; border-radius: 3px; }
@@ -101,6 +162,8 @@ html, body {
 .srcParagraph { margin: 3px 0 3px 2px; scroll-margin-top: 10px; border-radius: 3px; }
 .srcParagraphNum { color: #999; margin-right: 4px; }
 .srcItem { margin: 2px 0 2px 1.4em; }
+.srcSubitem { margin: 2px 0 2px 1.4em; }
+.srcItemColumn { margin: 2px 0 2px 1.4em; }
 .srcItemTitle { color: #999; margin-right: 4px; }
 .srcSuppl { margin-top: 20px; padding-top: 8px; border-top: 1px dashed #bbb; }
 .srcSupplLabel { font-weight: bold; color: #1f3a5f; }
@@ -131,6 +194,17 @@ html, body {
 .tok-connective {
   color: #777; background: #f0f0f0; padding: 0 2px; border-radius: 3px; font-size: 12px;
 }
+.tok-delegate {
+  color: #8a5a00; text-decoration: underline dashed; text-decoration-color: #d9a441;
+}
+
+.defViewCandidateList { list-style: none; margin: 6px 0; padding: 0; }
+.defViewCandidateList li {
+  border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; margin-bottom: 5px; background: #fff; cursor: pointer;
+}
+.defViewCandidateList li:hover { background: #eef3fa; }
+.defViewCandidateTitle { font-weight: bold; font-size: 12.5px; }
+.defViewCandidateMeta { font-size: 11px; color: #666; }
 
 #inspectPane {
   width: 340px;
@@ -158,6 +232,23 @@ html, body {
   border: 1px solid #1f3a5f; color: #1f3a5f; background: #fff; border-radius: 3px; cursor: pointer;
 }
 .jumpBtn:hover { background: #1f3a5f; color: #fff; }
+
+/* 定義内容ビューの構築ステップ(実行時)は、静的な解決トレースと見分けられるよう
+   左枠線の色だけ変える。中身の見た目(フォント等)は揃える */
+.stackFrameView { border-left: 3px solid #0d6b3f; }
+
+.defViewSourceLabel {
+  color: #0d6b3f; font-weight: bold; font-size: 11px; margin: 4px 0 2px;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.defViewLawInfo { font-size: 13px; }
+
+/* ハイライトは(点滅ではなく)常時表示のまま。プレビュー内のどこが該当箇所かを示す */
+.defViewHighlight {
+  background: #fff3b0 !important;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px #f0d060;
+}
 
 .scopeGroup { margin-bottom: 10px; }
 .scopeGroupTitle { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 4px; }

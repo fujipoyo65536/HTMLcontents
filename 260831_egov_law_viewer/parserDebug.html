@@ -27,9 +27,15 @@
   </nav>
 
   <main id="sourcePane">
-    <div class="paneTitle">ソース</div>
-    <div id="sourceLoading" hidden>解析中…</div>
-    <div id="sourceBody"></div>
+    <div id="sourceScroll">
+      <div class="paneTitle">ソース</div>
+      <div id="sourceLoading" hidden>解析中…</div>
+      <div id="sourceBody"></div>
+    </div>
+    <section id="defViewPane" class="empty">
+      <div class="paneTitle">定義内容ビュー <span id="defViewPaneHint" class="paneTitleHint">（トークンをクリックすると表示されます）</span></div>
+      <div id="defViewStack"></div>
+    </section>
   </main>
 
   <aside id="inspectPane">

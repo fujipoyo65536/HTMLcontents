@@ -99,11 +99,26 @@
     '又は', '若しくは', '及び', '並びに', 'かつ', 'ただし', '但し', 'なお',
     '専ら', 'もっぱら', '主として', '特に', '直接に', '直接', '別に', '別途', '同じく', '同様に'
   ];
+  // 「〜によって認識することができない方法により道路運送車両法（…）」のように、
+  // 前方一致のブラックリストでは削り切れない長い修飾句が挟まることがある。
+  // これらの語で終わる節は法令名の一部になり得ないため、直近の出現位置より後ろだけを
+  // 法令名候補として採用する。
+  const CITATION_BOUNDARY_MARKERS = [
+    'により', 'によって', 'によつて', 'に基づき', 'に基づいて',
+    'に従い', 'に従って', 'に応じて', 'に関し', 'に関して'
+  ];
   const SELF_REFERENCE_RE = /^(?:この|同|当該|前記|前項|前条|前号|次項|次条)/;
   const BARE_SUFFIX_ONLY_RE = new RegExp('^' + LAW_SUFFIX + '$');
 
   function cleanCitationName(raw) {
     let name = raw;
+    let bestCut = -1;
+    CITATION_BOUNDARY_MARKERS.forEach((marker) => {
+      const idx = name.lastIndexOf(marker);
+      if (idx !== -1) bestCut = Math.max(bestCut, idx + marker.length);
+    });
+    if (bestCut > 0 && bestCut < name.length) name = name.slice(bestCut);
+
     let changed = true;
     while (changed && name.length > 2) {
       changed = false;
@@ -124,6 +139,23 @@
     if (BARE_SUFFIX_ONLY_RE.test(name)) return false;
     return true;
   }
+
+  // 施行令・施行規則は、本文中で「以下「法」という。」等の明示的な定義をせずに、
+  // 題名から自明な慣習として親法令を「法」と略すことが多い(例:「道路交通法施行令」
+  // の場合、本文の「法」は常に「道路交通法」を指す)。この慣習をタイトルから
+  // 機械的に導出し、明示定義が無い場合のフォールバックとしてabbrevMapに補う。
+  const CONVENTIONAL_ABBREV_SUFFIXES = ['施行令', '施行規則'];
+  function deriveConventionalAbbrevs(lawTitle) {
+    const map = {};
+    if (!lawTitle) return map;
+    for (const suffix of CONVENTIONAL_ABBREV_SUFFIXES) {
+      if (lawTitle.length > suffix.length && lawTitle.endsWith(suffix)) {
+        map['法'] = { lawName: lawTitle.slice(0, -suffix.length), lawNum: null };
+        break;
+      }
+    }
+    return map;
+  }
   // グループ: 1=法令名 2=法令番号(分岐A) 3=略称(分岐A,任意) 4=略称(分岐B) 5=第N条(任意) 6=第N項(任意)
   // 分岐A:「道路法（昭和二十七年法律第百八十号。以下「法」という。）」のように
   //        法令番号と略称定義が同じ括弧内に同居するケース。
@@ -137,7 +169,9 @@
     '以下「([^」]{1,12})」という。?' +
     ')[^（）]{0,20}?）' +
     '(第' + KANJI_NUM + '条)?' +
-    '(第' + KANJI_NUM + '項)?',
+    '(の' + KANJI_NUM + ')?' +
+    '(第' + KANJI_NUM + '項)?' +
+    '(第' + KANJI_NUM + '号)?',
     'g'
   );
   // 委任文言の「◯◯省令」等は列挙で厳密にマッチさせる。可変長の前方一致([^…]{0,N}?)は
@@ -164,7 +198,9 @@
   const BARE_CITATION_RE = new RegExp(
     '(' + KANJI_ONLY + '{2,20}?' + LAW_SUFFIX + ')' +
     '第(' + KANJI_NUM + ')条' +
-    '(第' + KANJI_NUM + '項)?',
+    '(?:の(' + KANJI_NUM + '))?' +
+    '(第' + KANJI_NUM + '項)?' +
+    '(第' + KANJI_NUM + '号)?',
     'g'
   );
 
@@ -196,7 +232,9 @@
           lawName,
           lawNum: resolvedLawNum,
           articleKanji: m[5] ? m[5].replace(/^第|条$/g, '') : null,
-          paragraphKanji: m[6] ? m[6].replace(/^第|項$/g, '') : null
+          articleSubKanji: m[6] ? m[6].replace(/^の/, '') : null,
+          paragraphKanji: m[7] ? m[7].replace(/^第|項$/g, '') : null,
+          itemKanji: m[8] ? m[8].replace(/^第|号$/g, '') : null
         });
       }
     }
@@ -217,7 +255,9 @@
         lawName,
         lawNum: null,
         articleKanji: m[2] || null,
-        paragraphKanji: m[3] ? m[3].replace(/^第|項$/g, '') : null
+        articleSubKanji: m[3] || null,
+        paragraphKanji: m[4] ? m[4].replace(/^第|項$/g, '') : null,
+        itemKanji: m[5] ? m[5].replace(/^第|号$/g, '') : null
       });
     }
 
@@ -235,7 +275,13 @@
     // 文書内で既に定義済みの略称（例:「法」「令」）を使った引用も同じ扱いでリンク化する。
     Object.keys(abbrevMap).forEach((abbrev) => {
       const info = abbrevMap[abbrev];
-      const re = new RegExp(escapeRegex(abbrev) + '(第' + KANJI_NUM + '条)(第' + KANJI_NUM + '項)?', 'g');
+      const re = new RegExp(
+        escapeRegex(abbrev) + '(第' + KANJI_NUM + '条)' +
+        '(?:の(' + KANJI_NUM + '))?' +
+        '(第' + KANJI_NUM + '項)?' +
+        '(第' + KANJI_NUM + '号)?',
+        'g'
+      );
       let am;
       while ((am = re.exec(text))) {
         matches.push({
@@ -246,20 +292,52 @@
           lawName: info.lawName,
           lawNum: info.lawNum,
           articleKanji: am[1].replace(/^第|条$/g, ''),
-          paragraphKanji: am[2] ? am[2].replace(/^第|項$/g, '') : null
+          articleSubKanji: am[2] || null,
+          paragraphKanji: am[3] ? am[3].replace(/^第|項$/g, '') : null,
+          itemKanji: am[4] ? am[4].replace(/^第|号$/g, '') : null
         });
       }
     });
 
-    matches.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+    const withContinuations = expandParagraphContinuations(matches, text);
+
+    withContinuations.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
     const result = [];
     let lastEnd = -1;
-    matches.forEach((m2) => {
+    withContinuations.forEach((m2) => {
       if (m2.start < lastEnd) return; // 重複区間は先勝ち
       result.push(m2);
       lastEnd = m2.end;
     });
     return result;
+  }
+
+  // 「第二十条第一項及び第二項」「道路法（…）第三十条第一項及び第二項」のように、
+  // 条番号を伴わない「第◯項」が列挙で続く場合、直前の引用から項番号だけを
+  // 引き継いだ追加リンクを作る。
+  const PARA_CONTINUATION_RE = new RegExp('^(?:、|及び|又は|並びに|若しくは)第(' + KANJI_NUM + ')項');
+  function expandParagraphContinuations(matches, text) {
+    const extra = [];
+    matches.forEach((m) => {
+      if (m.type !== 'explicit' || !m.paragraphKanji) return;
+      let pos = m.end;
+      while (true) {
+        const rest = text.slice(pos);
+        const cm = PARA_CONTINUATION_RE.exec(rest);
+        if (!cm) break;
+        const literalOffset = cm[0].indexOf('第');
+        const literalText = cm[0].slice(literalOffset);
+        extra.push(Object.assign({}, m, {
+          start: pos + literalOffset,
+          end: pos + cm[0].length,
+          text: literalText,
+          paragraphKanji: cm[1],
+          itemKanji: null
+        }));
+        pos += cm[0].length;
+      }
+    });
+    return matches.concat(extra);
   }
 
   function scanSentenceText(text, ctx) {
@@ -276,9 +354,13 @@
         if (m.lawNum) a.dataset.lawNum = m.lawNum;
         a.dataset.lawName = m.lawName;
         const artNum = kanjiToInt(m.articleKanji);
+        const artSubNum = kanjiToInt(m.articleSubKanji);
         const paraNum = kanjiToInt(m.paragraphKanji);
+        const itemNum = kanjiToInt(m.itemKanji);
         if (artNum) a.dataset.article = String(artNum);
+        if (artSubNum) a.dataset.articleSub = String(artSubNum);
         if (paraNum) a.dataset.paragraph = String(paraNum);
+        if (itemNum) a.dataset.item = String(itemNum);
         frag.appendChild(a);
       } else {
         const span = document.createElement('span');
@@ -364,6 +446,7 @@
     return function (node, ctx) {
       const div = document.createElement('div');
       div.className = cls;
+      if (node.attr && node.attr.Num) div.dataset.num = node.attr.Num;
       div.appendChild(renderChildren(node, ctx));
       return div;
     };
@@ -436,6 +519,11 @@
     },
 
     Item: itemLikeHandler('item'),
+    // 号/イロハの本文が「説明」「速度」等の複数列(Column)に分かれている場合、
+    // 何もしないと(genericNodeのdisplay:contentsで)地続きに見えてしまう。
+    // 階層が異なる情報を横並びにすると読みにくいため、イロハ等と同様に
+    // 行を分けたツリー表示にする。
+    Column: itemLikeHandler('itemColumn'),
     ItemTitle(node, ctx) {
       const span = document.createElement('span');
       span.className = 'itemTitle';
@@ -647,7 +735,7 @@
       document.getElementById('lawTitleDisplay').textContent = info.law_title || '(法令名不明)';
       document.getElementById('lawNumDisplay').textContent = info.law_num || '';
 
-      const ctx = { lawTitle: info.law_title, lawId, abbrevMap: {}, lawNumByName: {} };
+      const ctx = { lawTitle: info.law_title, lawId, abbrevMap: deriveConventionalAbbrevs(info.law_title), lawNumByName: {} };
       contentBody.innerHTML = '';
       contentBody.appendChild(renderNode(data.law_full_text, ctx));
       renderToc(collectToc(data.law_full_text));
@@ -773,12 +861,14 @@
     try {
       if (entry.kind === 'law') {
         const reqOpts = {};
-        if (entry.articleNum) reqOpts.elm = 'MainProvision-Article_' + entry.articleNum;
+        if (entry.articleNum) {
+          reqOpts.elm = 'MainProvision-Article_' + entry.articleNum + (entry.articleSub ? '_' + entry.articleSub : '');
+        }
         const data = await EgovApi.getLawData(entry.idOrNum, reqOpts);
         const info = data.revision_info || {};
         entry.resolvedLawId = (data.law_info && data.law_info.law_id) || entry.idOrNum;
         entry.resolvedTitle = info.law_title;
-        titleEl.textContent = info.law_title + (entry.articleNum ? ' 第' + entry.articleNum + '条' : '');
+        titleEl.textContent = info.law_title + (entry.articleNum ? ' 第' + entry.articleNum + '条' + (entry.articleSub ? 'の' + entry.articleSub : '') : '');
         body.innerHTML = '';
 
         if (entry.autoResolved) {
@@ -800,14 +890,20 @@
           body.appendChild(hint);
         }
 
-        const ctx = { lawTitle: info.law_title, lawId: entry.resolvedLawId, abbrevMap: {}, lawNumByName: {} };
+        const ctx = { lawTitle: info.law_title, lawId: entry.resolvedLawId, abbrevMap: deriveConventionalAbbrevs(info.law_title), lawNumByName: {} };
         const rendered = renderNode(data.law_full_text, ctx);
         body.appendChild(rendered);
         if (rendered && rendered.tagName === 'DETAILS') rendered.open = true;
 
-        if (entry.paragraphNum) {
+        if (entry.paragraphNum || entry.itemNum) {
           requestAnimationFrame(() => {
-            const target = body.querySelector('.paragraph[data-num="' + entry.paragraphNum + '"]');
+            let target = entry.paragraphNum
+              ? body.querySelector('.paragraph[data-num="' + entry.paragraphNum + '"]')
+              : null;
+            if (entry.itemNum) {
+              const itemTarget = (target || body).querySelector('.item[data-num="' + entry.itemNum + '"]');
+              if (itemTarget) target = itemTarget;
+            }
             if (target) {
               openAncestorDetails(target);
               target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -937,7 +1033,9 @@
   async function resolveExplicitByName(a) {
     const lawName = a.dataset.lawName;
     const articleNum = a.dataset.article || null;
+    const articleSub = a.dataset.articleSub || null;
     const paragraphNum = a.dataset.paragraph || null;
+    const itemNum = a.dataset.item || null;
     const panel = document.getElementById('refPanel');
     const titleEl = document.getElementById('refPanelTitle');
     const body = document.getElementById('refPanelBody');
@@ -955,7 +1053,9 @@
         kind: 'law',
         idOrNum: best.law_info.law_id,
         articleNum,
+        articleSub,
         paragraphNum,
+        itemNum,
         title: best.revision_info.law_title
       });
     } catch (err) {
@@ -973,7 +1073,9 @@
             kind: 'law',
             idOrNum: a.dataset.lawNum,
             articleNum: a.dataset.article || null,
+            articleSub: a.dataset.articleSub || null,
             paragraphNum: a.dataset.paragraph || null,
+            itemNum: a.dataset.item || null,
             title: a.dataset.lawName
           });
         } else {

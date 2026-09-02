@@ -270,6 +270,10 @@ details[open] > summary::before {
   margin-right: 6px;
 }
 
+.itemColumn {
+  margin: 2px 0 2px 1.6em;
+}
+
 .supplProvision {
   margin-top: 36px;
   padding-top: 12px;
