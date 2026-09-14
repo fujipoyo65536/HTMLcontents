@@ -2043,11 +2043,13 @@ const csvProcessor = {
 		let resultArray = [];
 		// const limit = 1;
 		const limit = 50_000_000;
-		let lastSplitPosition = 0;
+		// 安全な区切り位置が1つも見つからなかった場合、restは今回のバッファを丸ごと維持する必要があるため、
+		// 初期値は-1にしておく(0のままだと、何もデコードできなかったのにslice(1)で先頭1バイトが消えてしまう)
+		let lastSplitPosition = -1;
 		let textArray = []; // 分割前テキスト配列(中身はUInt8)
 		for(let i = 0; i < uInt8Array.length; i++){
 			textArray.push(uInt8Array[i]);
-			if(textArray.length >= limit || i > uInt8Array.length-20){
+			if(textArray.length >= limit || i > uInt8Array.length-100){
 				// encodeごとに、区切って良い位置かを判定
 				let breakSafeFlag
 				switch(encode){
