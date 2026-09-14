@@ -755,60 +755,49 @@ const csvProcessor = {
 		
 		// ユーザー関数の準備
 		{
+			// makeUserFuncは、コードが空欄の場合は"userFunc is empty"という文字列を返すが、
+			// コードが書かれているのに構文エラー等で定義に失敗した場合も(エラーメッセージの)文字列を返す。
+			// 前者は正常系(そのフックは単に使わない)だが、後者はユーザーの意図した処理が実行されないまま
+			// 処理が進んでしまう危険な状態なので、区別して後者の場合は処理を中止する。
+			const userFuncCompileErrors = [];
+			const compileUserFunc = (label,code,varNames)=>{
+				const result = csvProcessor.makeUserFunc(code,varNames);
+				if(typeof result === 'function')return result;
+				if(result !== "userFunc is empty"){
+					userFuncCompileErrors.push(`${label}: ${result}`);
+				}
+				return undefined;
+			};
+
 			// 入力ファイルごとに実行する処理
-			
-			let perInputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perInputCode.getValue(),csvProcessor.userFuncVars.perInput);
-			if(typeof perInputFunc === 'function'){
-				csvProcessor.perInputFunc = perInputFunc;
-				csvProcessor.perInputFuncFlag = true;
-			}else if(typeof perInputFunc === 'string'){
-				csvProcessor.perInputFunc = undefined;
-				console.log("入力ファイルごとに実行する処理は定義されませんでした",perInputFunc);
-				csvProcessor.perInputFuncFlag = false;
-			}
-			
+			csvProcessor.perInputFunc = compileUserFunc("読込ごとの処理",csvProcessor.editors.perInputCode.getValue(),csvProcessor.userFuncVars.perInput);
+			csvProcessor.perInputFuncFlag = typeof csvProcessor.perInputFunc === 'function';
+
 			// 行ごとに実行する処理
-			let perRowFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perRowCode.getValue(),csvProcessor.userFuncVars.perRow);
-			if(typeof perRowFunc === 'function'){
-				csvProcessor.perRowFunc = perRowFunc;
-				csvProcessor.perRowFuncFlag = true;
-			}else if(typeof perRowFunc === 'string'){
-				csvProcessor.perRowFunc = undefined;
-				console.log("行ごとに実行する処理は定義されませんでした",perRowFunc);
-				csvProcessor.perRowFuncFlag = false;
-			}
-			
+			csvProcessor.perRowFunc = compileUserFunc("行ごとの処理",csvProcessor.editors.perRowCode.getValue(),csvProcessor.userFuncVars.perRow);
+			csvProcessor.perRowFuncFlag = typeof csvProcessor.perRowFunc === 'function';
+
 			// セルごとに実行する処理
-			let perCellFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perCellCode.getValue(),csvProcessor.userFuncVars.perCell);
-			if(typeof perCellFunc === 'function'){
-				csvProcessor.perCellFunc = perCellFunc;
-				csvProcessor.perCellFuncFlag = true;
-			}else if(typeof perCellFunc === 'string'){
-				csvProcessor.perCellFunc = undefined;
-				console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
-				csvProcessor.perCellFuncFlag = false;
-			}
-			
+			csvProcessor.perCellFunc = compileUserFunc("セルごとの処理",csvProcessor.editors.perCellCode.getValue(),csvProcessor.userFuncVars.perCell);
+			csvProcessor.perCellFuncFlag = typeof csvProcessor.perCellFunc === 'function';
+
 			// 出力ファイルごとに実行する処理
-			let perOutputFunc = csvProcessor.makeUserFunc(csvProcessor.editors.perOutputCode.getValue(),csvProcessor.userFuncVars.perOutput);
-			if(typeof perOutputFunc === 'function'){
-				csvProcessor.perOutputFunc = perOutputFunc;
-				csvProcessor.perOutputFuncFlag = true;
-			}else if(typeof perOutputFunc === 'string'){
-				csvProcessor.perOutputFunc = undefined;
-				console.log("出力ファイルごとに実行する処理は定義されませんでした",perOutputFunc);
-				csvProcessor.perOutputFuncFlag = false;
-			}
+			csvProcessor.perOutputFunc = compileUserFunc("書込ごとの処理",csvProcessor.editors.perOutputCode.getValue(),csvProcessor.userFuncVars.perOutput);
+			csvProcessor.perOutputFuncFlag = typeof csvProcessor.perOutputFunc === 'function';
 
 			// 出力ファイル名を設定する処理
-			let outputFileNameFunc = csvProcessor.makeUserFunc(csvProcessor.editors.outputFileNameCode.getValue(),csvProcessor.userFuncVars.outputFileName);
-			if(typeof outputFileNameFunc === 'function'){
-				csvProcessor.outputFileNameFunc = outputFileNameFunc;
-				csvProcessor.outputFileNameFuncFlag = true;
-			}else if(typeof outputFileNameFunc === 'string'){
-				csvProcessor.outputFileNameFunc = undefined;
-				console.log("出力ファイル名を設定する処理は定義されませんでした",outputFileNameFunc);
-				csvProcessor.outputFileNameFuncFlag = false;
+			csvProcessor.outputFileNameFunc = compileUserFunc("出力ファイル名",csvProcessor.editors.outputFileNameCode.getValue(),csvProcessor.userFuncVars.outputFileName);
+			csvProcessor.outputFileNameFuncFlag = typeof csvProcessor.outputFileNameFunc === 'function';
+
+			// 1つでも定義に失敗したコードがあれば、ファイルには一切手を付けず処理を中止する
+			if(userFuncCompileErrors.length > 0){
+				console.error("ユーザーコードの定義に失敗したため、処理を中止しました。",userFuncCompileErrors);
+				csvProcessor.addLogText("output","ユーザーコードの定義に失敗したため、処理を中止しました。");
+				for(const errorLine of userFuncCompileErrors){
+					csvProcessor.addLogText("output",errorLine);
+				}
+				csvProcessor.dialog(`ユーザーコードの定義に失敗したため、処理を中止しました。\n${userFuncCompileErrors.join('\n')}`);
+				return;
 			}
 		}
 		
