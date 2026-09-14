@@ -844,7 +844,10 @@ const csvProcessor = {
 			let streamIndex = -1;
 			let loadedSize = 0;
 			let loadedRowNumber = 0;
-			
+			// AUTOの場合、最初のチャンクの内容から一度だけ文字コードを確定し、以降はこれを使い回す
+			// (毎チャンク判定すると、チャンクの途中でマルチバイト文字が分断されているときに誤判定するため)
+			let effectiveEncoding = options.inputEncoding;
+
 			while (true) {
 				console.log("chunk load start Index:",streamIndex);
 				let done,value;
@@ -880,8 +883,18 @@ const csvProcessor = {
 				
 				// ここでのvalueはUint8Array
 				readingBuffer = new Uint8Array([...readingBuffer, ...value]);
+
+				// AUTOの場合、最初のチャンクの時点で文字コードを確定する
+				if(options.inputEncoding == 'AUTO' && firstLoad){
+					effectiveEncoding = csvProcessor.detectInputEncoding(readingBuffer);
+					if(!effectiveEncoding){
+						throw new Error(`文字コードの自動判定に失敗しました(対応していない文字コードの可能性があります): ${csvFile.name}`);
+					}
+					csvProcessor.addLogText("output",`文字コードを自動判定しました: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${csvFile.name} → ${effectiveEncoding}`);
+				}
+
 				// 文字列配列として切り出せた部分と余り(文字列として成立しなかった部分)
-				let [textArray,rest] = csvProcessor.uInt8ArrayToTextArray(readingBuffer,csvProcessor.options.inputEncoding,done);
+				let [textArray,rest] = csvProcessor.uInt8ArrayToTextArray(readingBuffer,effectiveEncoding,done);
 				// ファイル先頭にBOM(U+FEFF)が残っていた場合は取り除く(文字コードによらず一律)
 				if(firstLoad && textArray[0] == '﻿'){
 					textArray.shift();
@@ -1092,6 +1105,8 @@ const csvProcessor = {
 			
 		} catch (error) {
 			console.error('Error reading stream:', error);
+			csvProcessor.addLogText("output",`ファイル処理中にエラーが発生し中断しました: ${csvFile.name} (${error.message})`);
+			csvProcessor.dialog(`ファイル処理中にエラーが発生し中断しました。\n${csvFile.name}\n${error.message}`);
 		} finally {
 			reader.releaseLock();
 		}
@@ -2032,6 +2047,30 @@ const csvProcessor = {
 		
 	},
 	
+	detectInputEncoding: (uint8Array)=>{
+		// encoding.jsで大まかな文字コードを判定し、このツール内で使っている名称(utf-8,shift-jis等)に変換する。
+		// 判定できない場合はnullを返す。
+		const detected = Encoding.detect(uint8Array);
+		switch(detected){
+			case 'UTF8':
+			case 'ASCII': // ASCIIはUTF-8の範囲に含まれるバイト列なので、UTF-8として扱ってよい
+			return 'utf-8';
+			case 'SJIS':
+			return 'shift-jis';
+			case 'EUCJP':
+			return 'euc-jp';
+			case 'JIS':
+			return 'iso-2022-jp';
+			case 'UTF16':
+			// UTF16(BOM有りまたはヒューリスティック)とだけ分かる状態なので、BE/LEを個別に判定する。
+			// BOMも無くLEとも判定できない場合は、RFC2781に従いBEとして扱う。
+			return Encoding.detect(uint8Array,['UTF16LE']) ? 'utf-16le' : 'utf-16be';
+			default:
+			// BINARY・UNICODE・判定失敗(false)は、このツールでは対応不能として扱う
+			return null;
+		}
+	},
+
 	uInt8ArrayToTextArray: (uInt8Array,encode,done)=>{
 		// マルチバイト文字に対応しつつ、1文字ずつの配列に変換
 		// 文字コードのデコードもする
