@@ -144,6 +144,18 @@ document.addEventListener('DOMContentLoaded', function() {
 	});
 
 	// タブ関係
+	// .tabContentは既定でdisplay:noneのため、非表示の間に初期化・計測されたCodeMirrorは
+	// 寸法がおかしいまま固まってしまう。タブが表示された直後に、その中のCodeMirrorだけ
+	// refresh()して再計測させる。
+	const refreshCodeMirrorsIn = function(container){
+		if(!container)return;
+		container.querySelectorAll('.CodeMirror').forEach(function(el){
+			if(el.CodeMirror){
+				el.CodeMirror.refresh();
+			}
+		});
+	};
+
 	const previewPaneTabs = document.querySelectorAll('#previewPaneTabBox>.tab');
 	const previewPaneContents = document.querySelectorAll('#previewPaneContentBox>.tabContent');
 	previewPaneTabs.forEach(function(tab, tabIndex) {
@@ -156,10 +168,11 @@ document.addEventListener('DOMContentLoaded', function() {
 			});
 			tab.classList.add('active');
 			previewPaneContents[tabIndex].classList.add('active');
+			refreshCodeMirrorsIn(previewPaneContents[tabIndex]);
 		});
 	});
 	previewPaneTabs[0].click();
-	
+
 	const codePaneTabs = document.querySelectorAll('#codePaneTabBox>.tab');
 	const codePaneContents = document.querySelectorAll('#codePaneContentBox>.tabContent');
 	codePaneTabs.forEach(function(tab,tabIndex){
@@ -172,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			});
 			tab.classList.add('active');
 			codePaneContents[tabIndex].classList.add('active');
+			refreshCodeMirrorsIn(codePaneContents[tabIndex]);
 		});
 	});
 	codePaneTabs[2].click();
@@ -860,6 +874,7 @@ const csvProcessor = {
 			csvProcessor.dialog("入力ファイルが選択されていません。");
 			return;
 		}
+		csvProcessor.resetProgress();
 		//Inputファイルごとループ
 		for(const [csvIndex,file] of csvProcessor.inputFiles.entries()){
 			if(abortSignal.aborted){
@@ -911,6 +926,9 @@ const csvProcessor = {
 			// AUTOの場合、最初のチャンクの内容から一度だけ文字コードを確定し、以降はこれを使い回す
 			// (毎チャンク判定すると、チャンクの途中でマルチバイト文字が分断されているときに誤判定するため)
 			let effectiveEncoding = options.inputEncoding;
+			// 列数が合わない行は処理自体は続行する仕様のままとし、気付けるように1ファイルにつき1回だけログを出す
+			let expectedColumnCount = null;
+			let columnMismatchLogged = false;
 
 			while (true) {
 				// 強制中断のチェック(チャンク単位)
@@ -926,7 +944,24 @@ const csvProcessor = {
 					value = tmp.value;
 				}else{// 強制一括読み込み
 					if(streamIndex == -1){
-						value = new Uint8Array(await csvFile.fileObj.arrayBuffer());
+						// .arrayBuffer()は読み込み中の進捗が一切取れないため、
+						// 同じreader(ストリーム)でチャンクを読み集めて1つに結合する。
+						// 「分割せず処理する」という仕様自体は変えず、読み込み方法だけ変える。
+						let chunks = [];
+						let loadedSoFar = 0;
+						while(true){
+							const tmp = await reader.read();
+							if(tmp.done)break;
+							chunks.push(tmp.value);
+							loadedSoFar += tmp.value.length;
+							csvProcessor.updateProgress(csvIndex,loadedSoFar,csvFile.fileObj.size);
+						}
+						value = new Uint8Array(loadedSoFar);
+						let offset = 0;
+						for(const chunk of chunks){
+							value.set(chunk,offset);
+							offset += chunk.length;
+						}
 						done = false;
 					}else{
 						done = true;
@@ -938,6 +973,7 @@ const csvProcessor = {
 				}else{
 					value = new Uint8Array(0);
 				}
+				csvProcessor.updateProgress(csvIndex,loadedSize,csvFile.fileObj.size);
 				let allLoaded = value.length==csvFile.fileObj.size //1回で全てのデータが読み込まれたかどうか
 				let completed = loadedSize == csvFile.fileObj.size; //全体が読み込まれたかどうか
 				let firstLoad = streamIndex == 0;
@@ -1042,6 +1078,15 @@ const csvProcessor = {
 				
 				for(let [rowIndex,rowArray] of csvArray.entries()){
 					if(rowArray === null)continue;
+
+					// 列数不一致の検知(ユーザー処理で行の形が変わる前の、パース直後の状態でチェックする)
+					if(expectedColumnCount === null){
+						expectedColumnCount = rowArray.length;
+					}else if(!columnMismatchLogged && rowArray.length !== expectedColumnCount){
+						csvProcessor.addLogText("output",`列数が基準(${expectedColumnCount}列)と異なる行を検出しました。処理はそのまま続行します: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${csvFile.name} ${loadedRowNumber+rowIndex+1}行目 (${rowArray.length}列)`);
+						columnMismatchLogged = true;
+					}
+
 					// 行ごとに行う処理
 					const rowText = rowTextArray[rowIndex];
 					// ユーザー処理
@@ -2098,7 +2143,38 @@ const csvProcessor = {
 			element.removeChild(element.firstChild);
 		}
 	},
-	
+
+	formatBytes: (bytes)=>{
+		if(bytes < 1000) return `${bytes} バイト`;
+		if(bytes < 1000*1000) return `${(bytes/1000).toFixed(1)} KB`;
+		if(bytes < 1000*1000*1000) return `${(bytes/(1000*1000)).toFixed(1)} MB`;
+		return `${(bytes/(1000*1000*1000)).toFixed(1)} GB`;
+	},
+
+	resetProgress: ()=>{
+		const totalFiles = csvProcessor.inputFiles ? csvProcessor.inputFiles.length : 0;
+		document.getElementById('overallProgressBar').value = 0;
+		document.getElementById('overallProgressLabel').textContent = `0% 0/${totalFiles}ファイル`;
+		document.getElementById('fileProgressBar').value = 0;
+		document.getElementById('fileProgressLabel').textContent = `0 バイト / 0 バイト`;
+	},
+
+	updateProgress: (csvIndex,loadedBytes,totalBytes)=>{
+		const totalFiles = csvProcessor.inputFiles ? csvProcessor.inputFiles.length : 0;
+		const currentFileFraction = totalBytes > 0 ? loadedBytes/totalBytes : 1;
+
+		// 全体(現在処理中のファイルの内部進捗も加味して滑らかに動かす)
+		const overallFraction = totalFiles > 0 ? (csvIndex+currentFileFraction)/totalFiles : 0;
+		const overallPercent = Math.round(overallFraction*1000)/10;
+		document.getElementById('overallProgressBar').value = overallPercent;
+		document.getElementById('overallProgressLabel').textContent = `${overallPercent}% ${Math.min(csvIndex+1,totalFiles)}/${totalFiles}ファイル`;
+
+		// このファイル(バイト数表示)
+		const filePercent = Math.round(currentFileFraction*1000)/10;
+		document.getElementById('fileProgressBar').value = filePercent;
+		document.getElementById('fileProgressLabel').textContent = `${csvProcessor.formatBytes(loadedBytes)} / ${csvProcessor.formatBytes(totalBytes)}`;
+	},
+
 	splitTextArray: (inputTextData,delimiter,returnType)=>{
 		// delimiterは2文字までに対応
 		
