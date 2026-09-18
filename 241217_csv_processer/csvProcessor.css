@@ -191,14 +191,14 @@ margin: 0;
   background: #FFF;
   height: calc(100%);
   box-shadow: 0 0 3px #999;
-  /* display: none; */
+  display: none;
   padding: 5px;
   overflow: hidden;
 }
 
-/* .tabContent.active{
+.tabContent.active{
   display: block;
-} */
+}
 
 /* previewPane */
 #previewPane{
@@ -206,14 +206,24 @@ margin: 0;
   grid-column: 1/2;
   background-color: #DEE;
   padding: 5px;
-  
+
   display: grid;
   grid-template-rows: 30px 1fr;
+  /* CSS Gridのグリッドアイテムは既定でmin-width/min-height:autoとなり、
+     中身(幅の広い表など)より縮まなくなってレイアウトが崩れるため、0を明示する */
+  min-width: 0;
+  min-height: 0;
 }
 #previewPaneTabBox{
   display: flex;
   justify-content: start;
   align-items: start;
+}
+
+#previewPaneContentBox{
+  /* #previewPane自身のグリッドアイテムでもあるため、同じ理由でmin-width/min-heightを0にする */
+  min-width: 0;
+  min-height: 0;
 }
 
 #fileTab>div{
@@ -227,9 +237,11 @@ margin: 0;
   grid-column: 2/3;
   background-color: #EEF;
   padding: 5px;
-  
+
   display: grid;
   grid-template-rows: 1fr 90px;
+  min-width: 0;
+  min-height: 0;
 }
 
 #settingPane>.subPane{
@@ -298,14 +310,21 @@ width: calc(80% - 10px);
   grid-column: 1/2;
   background-color: #DED;
   padding: 5px;
-  
+
   display: grid;
   grid-template-rows: 30px 1fr;
+  min-width: 0;
+  min-height: 0;
 }
 #codePaneTabBox{
   display: flex;
   justify-content: start;
   align-items: start;
+}
+
+#codePaneContentBox{
+  min-width: 0;
+  min-height: 0;
 }
 
 #perInputProcessTab>div,
@@ -342,39 +361,51 @@ width: calc(80% - 10px);
 }
 
 
-#inputPreviewBox{
-  font-size: 0.8em;
-  margin: 0 10px;
-  padding: 5px;
-  border: 1px dashed #666;
+/* 入力プレビュー・出力プレビューのタブは、上側(直接入力欄・出力テキスト等)は自然な高さのまま、
+   プレビュー表の部分だけが残りの縦スペースいっぱいに広がって、その中で縦横スクロールするようにする */
+#inputPreviewTab.active,
+#outputPreviewTab.active{
+  display: flex;
+  flex-direction: column;
+}
+#inputPreviewTab>.optionSet,
+#outputPreviewTab>h3,
+#outputPreviewTab>.optionSet{
+  flex-shrink: 0;
+}
+.previewSection{
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.previewSection>label,
+.previewSection>span{
+  flex-shrink: 0;
 }
 
-#inputPreviewTable{
-  border-collapse: collapse;
-}
-#inputPreviewTable th, #inputPreviewTable td{
-  border: 1px solid #555;
-  padding: 2px 5px;
-}
-#inputPreviewTable th{
-  font-weight: bold;
-  background-color: #CCC;
-}
-
+#inputPreviewBox,
 #outputPreviewBox{
   font-size: 0.8em;
   margin: 0 10px;
   padding: 5px;
   border: 1px dashed #666;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
+#inputPreviewTable,
 #outputPreviewTable{
   border-collapse: collapse;
 }
+#inputPreviewTable th, #inputPreviewTable td,
 #outputPreviewTable th, #outputPreviewTable td{
   border: 1px solid #555;
   padding: 2px 5px;
+  white-space: nowrap;
 }
+#inputPreviewTable th,
 #outputPreviewTable th{
   font-weight: bold;
   background-color: #CCC;

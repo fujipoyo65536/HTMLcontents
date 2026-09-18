@@ -8,16 +8,48 @@ html, body {
   background: #f3f3f3;
 }
 
+/* ヘッダー・本体(dbgBody)・下部ドロワーを縦のフレックスとして並べる。
+   dbgBodyの高さは固定計算(calc)にせずflex:1で「残り全部」にすることで、
+   ドロワーの開閉によるドロワー自身の高さの変化に自動で追従させる。
+   (以前はdbgBodyの高さをヘッダー+ドロワー見出しの固定px計算にしていたため、
+   ドロワーを開くと想定していなかった分だけページ全体がはみ出し、
+   ページ全体がスクロール対象になってヘッダーごと動いてしまっていた) */
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 #dbgHeader {
+  flex: none;
+  background: #1f3a5f;
+  color: #fff;
+}
+#dbgHeaderTop {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  background: #1f3a5f;
-  color: #fff;
 }
 #dbgHeader h1 { font-size: 15px; margin: 0; white-space: nowrap; }
 #backToViewerLink { color: #cfe0ff; font-size: 12px; white-space: nowrap; margin-left: auto; }
+
+/* 開いている法令のタイトルをヘッダー内に固定表示する。クリックでe-Govの当該法令
+   ページを新しいタブで開く。法令が未読み込みの間はリンク化しない(href未設定)。 */
+#lawHeading {
+  padding: 4px 16px 8px;
+  border-top: 1px solid rgba(255,255,255,.15);
+}
+#lawHeading a#lawTitleLink {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #fff;
+  text-decoration: none;
+}
+#lawHeading a#lawTitleLink[href]:hover #lawTitleDisplay { text-decoration: underline; }
+#lawHeading a#lawTitleLink:not([href]) { cursor: default; }
+#lawTitleDisplay { font-weight: bold; font-size: 13px; }
+#lawNumDisplay { font-size: 11px; color: #cfe0ff; }
 
 #searchBox { position: relative; flex: 1; max-width: 420px; }
 #searchInput { width: 100%; padding: 5px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 3px; }
@@ -35,7 +67,8 @@ html, body {
 
 #dbgBody {
   display: flex;
-  height: calc(100% - 41px - 28px); /* header + drawer tab strip (drawer body expands over this when open) */
+  flex: 1;
+  min-height: 0;
 }
 
 .paneTitle {
@@ -56,10 +89,6 @@ html, body {
   border-right: 1px solid #d0d0d0;
   overflow-y: auto;
 }
-#lawHeading { padding: 8px 10px; }
-#lawHeading #lawTitleDisplay { font-weight: bold; font-size: 12px; margin: 0 0 3px; }
-#lawHeading #lawNumDisplay { font-size: 11px; color: #666; margin: 0; }
-
 #tocList { list-style: none; margin: 0; padding: 4px 6px; font-size: 12px; }
 #tocList a { display: block; padding: 2px 6px; color: #1f3a5f; text-decoration: none; border-radius: 3px; }
 #tocList a:hover { background: #e4ecf7; }
@@ -168,6 +197,14 @@ html, body {
 .srcSuppl { margin-top: 20px; padding-top: 8px; border-top: 1px dashed #bbb; }
 .srcSupplLabel { font-weight: bold; color: #1f3a5f; }
 
+/* カッコの入れ子の深さごとの色分け(カッコ自体も含めて色付け)。
+   色弱でも判別しやすいよう、Okabe-Ito配色(カラーユニバーサルデザインで
+   広く使われる、色覚特性によらず区別しやすい配色)から採用している。 */
+.parenLv1 { color: #D55E00; } /* 朱色 */
+.parenLv2 { color: #0072B2; } /* 青 */
+.parenLv3 { color: #009E73; } /* 青緑 */
+.parenLv4 { color: #CC79A7; } /* 赤紫 */
+
 .refFlash { animation: flashBg 1.6s ease-out; }
 @keyframes flashBg { from { background: #fff3b0; } to { background: transparent; } }
 
@@ -206,17 +243,13 @@ html, body {
 .defViewCandidateTitle { font-weight: bold; font-size: 12.5px; }
 .defViewCandidateMeta { font-size: 11px; color: #666; }
 
-#inspectPane {
-  width: 340px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  background: #fafafa;
+/* コールスタック・スコープは下部ドロワーのタブとして表示する(#drawerBody側で
+   まとめてスクロールするため、ここでは個別のflex/overflow設定は不要)。 */
+.drawerPageTitle {
+  font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase;
+  letter-spacing: .03em; margin-bottom: 8px;
 }
-#callStackPanel, #scopePanel { display: flex; flex-direction: column; min-height: 0; }
-#callStackPanel { flex: 1.3; border-bottom: 1px solid #d0d0d0; }
-#scopePanel { flex: 1; }
-#callStackBody, #scopeBody { flex: 1; overflow-y: auto; padding: 8px 10px; font-size: 12px; }
+#callStackBody, #scopeBody { font-size: 12px; }
 .hint { color: #888; font-style: italic; }
 
 .stackFrame {
@@ -260,6 +293,7 @@ html, body {
 .scopeEntryDef { font-size: 11.5px; color: #555; margin-top: 2px; }
 
 #drawer {
+  flex: none;
   border-top: 1px solid #c8c8c8;
   background: #fafafa;
 }
@@ -269,7 +303,7 @@ html, body {
 }
 .drawerTab.active { background: #fafafa; font-weight: bold; color: #1a1a1a; }
 #drawerToggle { margin-left: auto; border: none; background: transparent; padding: 6px 12px; cursor: pointer; }
-#drawerBody { height: 220px; overflow-y: auto; padding: 10px 14px; font-size: 12px; }
+#drawerBody { height: 320px; overflow-y: auto; padding: 10px 14px; font-size: 12px; }
 #drawer.collapsed #drawerBody { display: none; }
 
 .drawerTable { width: 100%; border-collapse: collapse; }

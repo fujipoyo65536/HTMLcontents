@@ -4,6 +4,17 @@
   const API_BASE = 'https://laws.e-gov.go.jp/api/2';
   const cache = new Map();
 
+  // 条番号(Num属性)は「1」「1_2」だけでなく「1_2_3」(第一条の二の三)のように
+  // 二段階以上枝分かれすることがある。単純に'_'.split()して2要素目だけ取ると、
+  // 「1_2」(第一条の二)と「1_2_3」(第一条の二の三)が同じキー("M:1_2")になり
+  // 衝突してしまう。枝番号側は最初の'_'より後ろを丸ごと保持することで衝突を防ぐ。
+  function splitArticleNum(numStr) {
+    const s = String(numStr || '');
+    const idx = s.indexOf('_');
+    if (idx === -1) return [s, ''];
+    return [s.slice(0, idx), s.slice(idx + 1)];
+  }
+
   async function apiGet(path, params) {
     const url = new URL(API_BASE + path);
     url.searchParams.set('response_format', 'json');
@@ -39,15 +50,23 @@
   // -----------------------------------------------------------------------
   const state = {
     parseResult: null,
-    tokenRegistry: [],   // { token, node } のフラットリスト。DOM上は data-tok-idx で参照
-    lawStack: [],        // 「同法」「外部法令参照」で辿った際の戻り先 (idOrNum)
+    mainDocCtx: null,    // メイン文書の { parseResult, treeRoot, isMain: true }
+    tokenRegistry: [],   // { token, node, docCtx } のフラットリスト。DOM上は data-tok-idx で参照
     currentIdOrNum: null,
     selectedTokEl: null,
-    defViewStack: []     // 定義内容ビューの積み重ね。各要素: { token, node, contentEl }
+    defViewStack: []     // 定義内容ビューの積み重ね。各要素: { token, node, contentEl, docCtx }
   };
 
-  function registerToken(token, node) {
-    state.tokenRegistry.push({ token, node });
+  // 委任先・外部法令参照などで動的に取得したサブ文書は、それぞれ独立した
+  // 「文書コンテキスト」(パース結果 + 描画済みツリー)を持つ。サブ文書内で
+  // 見つかった同一法令内参照(direct等)は、メイン文書ではなくこのコンテキスト
+  // 自身のツリーの中で解決する必要があるため、トークンごとに紐付けておく。
+  function makeDocContext(parseResult, treeRoot, isMain) {
+    return { parseResult, treeRoot, isMain: !!isMain };
+  }
+
+  function registerToken(token, node, docCtx) {
+    state.tokenRegistry.push({ token, node, docCtx });
     return state.tokenRegistry.length - 1;
   }
 
@@ -61,31 +80,77 @@
   ]);
   for (let i = 1; i <= 10; i++) LEAF_TEXT_TAGS.add('Subitem' + i + 'Title');
 
-  function renderTokenizedText(sentenceNodes, cursor, plain) {
-    const node = sentenceNodes[cursor.i++];
+  // カッコ(全角「（）」・半角「()」)の中身を、カッコ自体を含めて入れ子の深さ順に
+  // 色分けする。日本語の法令文はカッコが何重にも入れ子になることが多く、
+  // どの閉じカッコがどの開きカッコに対応するか視覚的に分かりにくいための対応。
+  // トークン(引用・委任文言等のリンク)はカッコの深さ判定を跨いで途切れない
+  // 「不可分な一単位」として扱う(内部は解析せず素通しするが、開いている色の
+  // 内側には正しくネストされるため、カッコがトークンを挟んでも色が途切れない)。
+  const PAREN_COLOR_COUNT = 4;
+  function renderTextWithParenColors(text, tokens, buildTokenEl) {
     const frag = document.createDocumentFragment();
-    if (!node) return frag;
-    if (plain) {
-      // 条見出し(「第一条」等)はそれ自体が直接参照の正規表現に自己マッチしてしまうため、
-      // トークン化せず生テキストとして表示する(カーソルは進める=座標同期は保つ)。
-      frag.appendChild(document.createTextNode(node.text));
-      return frag;
+    const stack = [frag];
+    let plainStart = 0;
+    let depth = 0;
+    let ti = 0;
+    const flushPlain = (end) => {
+      if (end > plainStart) {
+        stack[stack.length - 1].appendChild(document.createTextNode(text.slice(plainStart, end)));
+      }
+    };
+    let i = 0;
+    while (i < text.length) {
+      if (ti < tokens.length && tokens[ti].start === i) {
+        flushPlain(i);
+        const t = tokens[ti];
+        const el = buildTokenEl(t);
+        if (el) stack[stack.length - 1].appendChild(el);
+        i = t.end;
+        plainStart = i;
+        ti++;
+        continue;
+      }
+      const ch = text[i];
+      if (ch === '（' || ch === '(') {
+        flushPlain(i);
+        depth++;
+        const span = document.createElement('span');
+        span.className = 'parenLv' + (((depth - 1) % PAREN_COLOR_COUNT) + 1);
+        stack[stack.length - 1].appendChild(span);
+        stack.push(span);
+        plainStart = i;
+      } else if ((ch === '）' || ch === ')') && depth > 0) {
+        flushPlain(i + 1);
+        depth--;
+        stack.pop();
+        plainStart = i + 1;
+      }
+      i++;
     }
-    let pos = 0;
-    (node.tokens || []).forEach((t) => {
-      if (t.start > pos) frag.appendChild(document.createTextNode(node.text.slice(pos, t.start)));
-      const span = document.createElement('span');
-      span.className = 'tok tok-' + t.type;
-      span.textContent = t.text;
-      span.dataset.tokIdx = String(registerToken(t, node));
-      frag.appendChild(span);
-      pos = t.end;
-    });
-    if (pos < node.text.length) frag.appendChild(document.createTextNode(node.text.slice(pos)));
+    flushPlain(text.length);
     return frag;
   }
 
-  function buildSourceTree(root, sentenceNodes) {
+  function renderTokenizedText(sentenceNodes, cursor, plain, docCtx) {
+    const node = sentenceNodes[cursor.i++];
+    if (!node) return document.createDocumentFragment();
+    if (plain) {
+      // 条見出し(「第一条」等)はそれ自体が直接参照の正規表現に自己マッチしてしまうため、
+      // トークン化せず生テキストとして表示する(カーソルは進める=座標同期は保つ)。
+      return renderTextWithParenColors(node.text, [], () => null);
+    }
+    return renderTextWithParenColors(node.text, node.tokens || [], (t) => {
+      const span = document.createElement('span');
+      span.className = 'tok tok-' + t.type;
+      span.textContent = t.text;
+      span.dataset.tokIdx = String(registerToken(t, node, docCtx));
+      return span;
+    });
+  }
+
+  // docCtx: このツリーが属する文書コンテキスト({ parseResult, treeRoot, isMain })。
+  // ツリー内の各トークンに紐付け、クリック時にどの文書を基準に解決するかを判定する。
+  function buildSourceTree(root, sentenceNodes, docCtx) {
     const cursor = { i: 0 };
 
     function renderChildren(node) {
@@ -108,7 +173,7 @@
         if (c.tag === titleTag) {
           const h = document.createElement('div');
           h.className = titleClass;
-          h.appendChild(renderTokenizedText(sentenceNodes, cursor));
+          h.appendChild(renderTokenizedText(sentenceNodes, cursor, false, docCtx));
           div.appendChild(h);
         } else {
           const el = render(c);
@@ -130,7 +195,7 @@
         if (titleTag && c.tag === titleTag) {
           const s = document.createElement('span');
           s.className = 'srcItemTitle';
-          s.appendChild(renderTokenizedText(sentenceNodes, cursor));
+          s.appendChild(renderTokenizedText(sentenceNodes, cursor, false, docCtx));
           div.appendChild(s);
         } else {
           const el = render(c);
@@ -145,7 +210,7 @@
       if (!node || !node.tag) return null;
       if (LEAF_TEXT_TAGS.has(node.tag)) {
         const span = document.createElement('span');
-        span.appendChild(renderTokenizedText(sentenceNodes, cursor));
+        span.appendChild(renderTokenizedText(sentenceNodes, cursor, false, docCtx));
         return span;
       }
       switch (node.tag) {
@@ -165,19 +230,19 @@
         case 'Article': {
           const details = document.createElement('details');
           details.className = 'srcArticle';
-          const [a, asub] = String((node.attr && node.attr.Num) || '').split('_');
+          const [a, asub] = splitArticleNum((node.attr && node.attr.Num) || '');
           details.dataset.articleKey = 'M:' + (a || '') + '_' + (asub || '');
           const summary = document.createElement('summary');
           (node.children || []).forEach((c) => {
             if (c.tag === 'ArticleTitle') {
               const s = document.createElement('span');
               s.className = 'srcArticleHead';
-              s.appendChild(renderTokenizedText(sentenceNodes, cursor, true));
+              s.appendChild(renderTokenizedText(sentenceNodes, cursor, true, docCtx));
               summary.appendChild(s);
             } else if (c.tag === 'ArticleCaption') {
               const s = document.createElement('span');
               s.className = 'srcArticleCaption';
-              s.appendChild(renderTokenizedText(sentenceNodes, cursor));
+              s.appendChild(renderTokenizedText(sentenceNodes, cursor, false, docCtx));
               summary.appendChild(s);
             }
           });
@@ -219,7 +284,7 @@
             if (c.tag === 'SupplProvisionLabel') {
               const h = document.createElement('div');
               h.className = 'srcSupplLabel';
-              h.appendChild(renderTokenizedText(sentenceNodes, cursor));
+              h.appendChild(renderTokenizedText(sentenceNodes, cursor, false, docCtx));
               div.appendChild(h);
             } else {
               const el = render(c);
@@ -352,7 +417,7 @@
   async function showCallStack(tokIdx, fromLevelIndex) {
     const entry = state.tokenRegistry[tokIdx];
     if (!entry) return;
-    const { token, node } = entry;
+    const { token, node, docCtx } = entry;
     document.getElementById('callStackTokenLabel').textContent = '「' + token.text + '」';
     const body = document.getElementById('callStackBody');
     body.innerHTML = '';
@@ -379,17 +444,20 @@
     // ここから先は「定義内容ビュー」(メインビュー下部)を構築する過程。実行時に行う
     // API取得・ノード検索・ハイライトの各ステップも、静的な解決トレースと同じ見た目で
     // コールスタックに積んでいく。ビュー本体はメインビュー下部のスタックに1段積む。
-    await pushDefViewLevel(token, node, body, fromLevelIndex);
+    await pushDefViewLevel(token, node, body, fromLevelIndex, docCtx);
 
-    if (token.resolvedCoord) {
+    // 「ジャンプ」系ボタンはメイン文書(#sourceBody)の中の位置へスクロールするためのもの。
+    // サブ文書(参照内容ビュー内で解析した外部法令)のトークンには対応する場所が無いため出さない。
+    const isMainDoc = !!(docCtx && docCtx.isMain);
+    if (isMainDoc && token.resolvedCoord) {
       const btn = document.createElement('button');
       btn.className = 'jumpBtn';
       btn.textContent = '解決先へジャンプ: ' + LP.describeCoord(token.resolvedCoord);
       btn.addEventListener('click', () => jumpToCoord(token.resolvedCoord));
       body.appendChild(btn);
     }
-    if (token.type === 'definition-use') {
-      const sym = state.parseResult.symbolTable.find((s) => s.id === token.symbolId);
+    if (isMainDoc && token.type === 'definition-use') {
+      const sym = docCtx.parseResult.symbolTable.find((s) => s.id === token.symbolId);
       if (sym) {
         const btn = document.createElement('button');
         btn.className = 'jumpBtn';
@@ -402,8 +470,8 @@
       if (token.lawName) {
         const btn = document.createElement('button');
         btn.className = 'jumpBtn';
-        btn.textContent = '「' + token.lawName + '」を解析する';
-        btn.addEventListener('click', () => openExternalLaw(token.lawName, token.lawNum));
+        btn.textContent = '「' + token.lawName + '」を別タブで解析する';
+        btn.addEventListener('click', () => openExternalLawInNewTab(token.lawName, token.lawNum));
         body.appendChild(btn);
       }
     }
@@ -487,19 +555,19 @@
     if (lastSection) lastSection.scrollIntoView({ block: 'start' });
   }
 
-  async function pushDefViewLevel(token, node, stackTraceBody, fromLevelIndex) {
+  async function pushDefViewLevel(token, node, stackTraceBody, fromLevelIndex, docCtx) {
     if (fromLevelIndex == null || fromLevelIndex < 0) {
       state.defViewStack = [];
     } else {
       state.defViewStack = state.defViewStack.slice(0, fromLevelIndex + 1);
     }
-    const level = { token, node, contentEl: null };
+    const level = { token, node, contentEl: null, docCtx };
     state.defViewStack.push(level);
     updateDefViewPaneVisibility();
     renderDefViewStackDom();
 
     const holder = document.createElement('div');
-    await renderDefinitionView(token, node, stackTraceBody, holder);
+    await renderDefinitionView(token, node, stackTraceBody, holder, docCtx);
     if (!holder.childNodes.length) {
       holder.innerHTML = '<p class="hint">このトークンには表示可能な参照内容がありません。</p>';
     }
@@ -530,11 +598,14 @@
     (target || clone).classList.add('defViewHighlight');
   }
 
-  // 同一法令内の座標に対応する、すでに描画済みのDOMノードを複製してハイライトする。
-  // (再描画せず既存ノードを複製することで、トークンの色分けやリンクをそのまま保つ)
-  function cloneCoordPreview(coord) {
+  // 指定した文書コンテキスト内の座標に対応する、すでに描画済みのDOMノードを複製して
+  // ハイライトする。(再描画せず既存ノードを複製することで、トークンの色分けやリンクを
+  // そのまま保つ) docCtx.treeRootは、メイン文書なら#sourceBody、外部法令の参照内容
+  // ビューなら、その文書全体を解析した際に構築したツリー(非表示・保持のみ)。
+  function cloneCoordPreview(coord, docCtx) {
+    if (!docCtx || !docCtx.treeRoot) return null;
     const key = 'M:' + (coord.articleNum || '') + '_' + (coord.articleSub || '');
-    const artEl = document.querySelector('#sourceBody [data-article-key="' + CSS.escape(key) + '"]');
+    const artEl = docCtx.treeRoot.querySelector('[data-article-key="' + CSS.escape(key) + '"]');
     if (!artEl) return null;
     const clone = artEl.cloneNode(true);
     if (clone.tagName === 'DETAILS') clone.open = true;
@@ -542,12 +613,12 @@
     return clone;
   }
 
-  async function renderDefinitionView(token, node, stackBody, viewBody) {
+  async function renderDefinitionView(token, node, stackBody, viewBody, docCtx) {
     if (token.type === 'definition-use') {
-      const sym = state.parseResult.symbolTable.find((s) => s.id === token.symbolId);
+      const sym = docCtx.parseResult.symbolTable.find((s) => s.id === token.symbolId);
       if (!sym) return;
       appendStackFrame(stackBody, 'VIEW', '定義内容ビューを構築中… (定義箇所: ' + LP.describeCoord(sym.definedAtCoord) + ')');
-      const clone = cloneCoordPreview(sym.definedAtCoord);
+      const clone = cloneCoordPreview(sym.definedAtCoord, docCtx);
       if (clone) {
         appendStackFrame(stackBody, 'VIEW', '同一法令内のノードを取得し、定義箇所をハイライトしました');
         appendDefView(viewBody, '定義内容', clone);
@@ -559,7 +630,7 @@
 
     if ((token.type === 'relative-simple' || token.type === 'direct' || token.type === 'direct-range' || token.type === 'direct-exclude') && token.resolvedCoord) {
       appendStackFrame(stackBody, 'VIEW', '定義内容ビューを構築中… (' + LP.describeCoord(token.resolvedCoord) + ')');
-      const clone = cloneCoordPreview(token.resolvedCoord);
+      const clone = cloneCoordPreview(token.resolvedCoord, docCtx);
       if (clone) {
         appendStackFrame(stackBody, 'VIEW', '同一法令内のノードを取得し、該当箇所をハイライトしました');
         appendDefView(viewBody, '参照内容', clone);
@@ -574,7 +645,7 @@
       const wrap = document.createElement('div');
       let found = 0;
       token.resolvedCoords.forEach((c) => {
-        const clone = cloneCoordPreview(c);
+        const clone = cloneCoordPreview(c, docCtx);
         if (clone) { wrap.appendChild(clone); found++; }
       });
       if (found) {
@@ -614,21 +685,26 @@
           return;
         }
 
-        const articleKey = token.articleNum + (token.articleSub ? '_' + token.articleSub : '');
         const articleLabel = '第' + token.articleNum + '条' + (token.articleSub ? 'の' + token.articleSub : '');
-        appendStackFrame(stackBody, 'VIEW', articleLabel + 'のデータを取得中…');
-        const data = await EgovApi.getLawData(lawIdOrNum, { elm: 'MainProvision-Article_' + articleKey });
+        // 条文単位で絞り込み取得すると、その法令自身の第一条にある略称定義
+        // (「以下「法」という。」等)が取得データに含まれず、参照先の中でさらに
+        // 別の条文を参照している場合に解決できない。文書全体を取得・解析することで、
+        // サブ文書自身も独立した1つの文書として正しく解析できるようにする。
+        appendStackFrame(stackBody, 'VIEW', '「' + token.lawName + '」の全文を取得・解析中…');
+        const data = await EgovApi.getLawData(lawIdOrNum, {});
         const title = data.revision_info && data.revision_info.law_title;
-        appendStackFrame(stackBody, 'VIEW', '取得完了: ' + title + ' ' + articleLabel);
-        const pr = LP.parseLaw(data.law_full_text, {});
-        const tree = buildSourceTree(data.law_full_text, pr.sentenceNodes);
-        if (tree && tree.classList) {
-          if (tree.tagName === 'DETAILS') tree.open = true;
-          tree.querySelectorAll && tree.querySelectorAll('details').forEach((d) => { d.open = true; });
-          highlightWithinClone(tree, token);
+        const subPr = LP.parseLaw(data.law_full_text, { lawId: data.law_info && data.law_info.law_id, lawTitle: title, lawNum: data.revision_info && data.revision_info.law_num });
+        const subDocCtx = makeDocContext(subPr, null, false);
+        const fullTree = buildSourceTree(data.law_full_text, subPr.sentenceNodes, subDocCtx);
+        subDocCtx.treeRoot = fullTree;
+        appendStackFrame(stackBody, 'VIEW', '取得・解析完了: ' + title + '。' + articleLabel + 'を抽出中…');
+        const clone = cloneCoordPreview(token, subDocCtx);
+        if (clone) {
+          appendStackFrame(stackBody, 'VIEW', '該当箇所をハイライトしました');
+          appendDefView(viewBody, title + ' の参照内容', clone);
+        } else {
+          appendStackFrame(stackBody, 'VIEW', articleLabel + 'が見つかりませんでした(未制定・削除された条文の可能性)');
         }
-        appendStackFrame(stackBody, 'VIEW', '該当箇所をハイライトしました');
-        appendDefView(viewBody, title + ' の参照内容', tree);
       } catch (err) {
         appendStackFrame(stackBody, 'VIEW', '取得に失敗しました: ' + err.message);
       }
@@ -636,9 +712,10 @@
     }
 
     if (token.type === 'delegate') {
-      const baseLawTitle = state.parseResult && state.parseResult.lawMeta && state.parseResult.lawMeta.lawTitle;
+      const baseLawTitle = docCtx && docCtx.parseResult && docCtx.parseResult.lawMeta && docCtx.parseResult.lawMeta.lawTitle;
       const articleNum = node.coord && node.coord.articleNum;
       const paragraphNum = node.coord && node.coord.paragraphNum;
+      const itemNum = node.coord && node.coord.itemNum;
       if (!baseLawTitle || !articleNum) {
         appendStackFrame(stackBody, 'VIEW', '委任元の法令名または条番号が不明なため、候補を検索できません');
         return;
@@ -649,9 +726,25 @@
         return;
       }
       try {
+        // 制定文(enactstatement)は「{基の法令名}（{法令番号}）第◯条」のように、法令名と
+        // 条番号の間に法令番号の括弧書きを挟んで書くのが通例で、略称を使わない。
+        // 単純な「{基の法令名}第◯条」というキーワードはこの括弧を跨げず、制定文に
+        // 明記されている(＝最も確度が高い)候補を取りこぼすことがあるため、括弧部分を
+        // ワイルドカードで橋渡しするクエリも併用する。
         const kwQuery = baseLawTitle + '第' + artKanji + '条';
-        appendStackFrame(stackBody, 'VIEW', 'キーワード検索: 「' + kwQuery + '」を含む法令を検索中…');
-        const kwResults = await EgovApi.searchKeyword({ keyword: kwQuery, limit: 100 });
+        const kwQueryWithNum = baseLawTitle + '（*）第' + artKanji + '条';
+        appendStackFrame(stackBody, 'VIEW', 'キーワード検索: 「' + kwQuery + '」「' + kwQueryWithNum + '」を含む法令を検索中…');
+        const [kwResults1, kwResults2] = await Promise.all([
+          EgovApi.searchKeyword({ keyword: kwQuery, limit: 100 }),
+          EgovApi.searchKeyword({ keyword: kwQueryWithNum, limit: 100 })
+        ]);
+        const seenLawIds = new Set();
+        const kwResults = [];
+        kwResults1.concat(kwResults2).forEach((r) => {
+          if (seenLawIds.has(r.law_info.law_id)) return;
+          seenLawIds.add(r.law_info.law_id);
+          kwResults.push(r);
+        });
         const ORDINANCE_TYPES = ['CabinetOrder', 'MinisterialOrdinance', 'Rule'];
         let candidates = kwResults.filter((r) => ORDINANCE_TYPES.indexOf(r.law_info.law_type) !== -1);
         appendStackFrame(stackBody, 'VIEW', 'キーワード検索結果: 政令・省令・規則が' + candidates.length + '件該当');
@@ -701,8 +794,12 @@
         });
         titleGuessHits.forEach((c) => {
           const already = scored.find((s) => s.c.law_info.law_id === c.law_info.law_id);
-          if (already) { if (!already.reason) already.reason = '題名が命名慣習に一致している'; }
-          else scored.push({ c, score: 2, reason: '題名が命名慣習に一致している' });
+          if (already) {
+            if (!already.reason) already.reason = '題名が命名慣習に一致している';
+            if (already.score < 2) already.score = 2;
+          } else {
+            scored.push({ c, score: 2, reason: '題名が命名慣習に一致している' });
+          }
         });
         scored.sort((a, b) => b.score - a.score);
 
@@ -714,7 +811,7 @@
         const triable = scored.filter((s) => s.score >= 2);
         for (const s of triable) {
           appendStackFrame(stackBody, 'VIEW', '「' + s.c.revision_info.law_title + '」の本文から該当条文を探索中…');
-          const found = await findBackReferenceArticle(s.c.law_info.law_id, baseLawTitle, articleNum, paragraphNum, token.ministryPhrase);
+          const found = await findBackReferenceArticle(s.c.law_info.law_id, baseLawTitle, articleNum, paragraphNum, itemNum, token.ministryPhrase);
           if (found) {
             hitArticle = found;
             top = s.c;
@@ -725,16 +822,20 @@
 
         if (hitArticle) {
           appendStackFrame(stackBody, 'VIEW', '該当条文が見つかりました: 「' + top.revision_info.law_title + '」第' + hitArticle + '条');
-          const data = await EgovApi.getLawData(top.law_info.law_id, { elm: 'MainProvision-Article_' + hitArticle });
-          const pr = LP.parseLaw(data.law_full_text, {});
-          const tree = buildSourceTree(data.law_full_text, pr.sentenceNodes);
-          if (tree && tree.classList) {
-            if (tree.tagName === 'DETAILS') tree.open = true;
-            tree.querySelectorAll && tree.querySelectorAll('details').forEach((d) => { d.open = true; });
-            tree.classList.add('defViewHighlight');
+          appendStackFrame(stackBody, 'VIEW', '「' + top.revision_info.law_title + '」の全文を取得・解析中…');
+          const data = await EgovApi.getLawData(top.law_info.law_id, {});
+          const subPr = LP.parseLaw(data.law_full_text, { lawId: data.law_info && data.law_info.law_id, lawTitle: data.revision_info && data.revision_info.law_title, lawNum: data.revision_info && data.revision_info.law_num });
+          const subDocCtx = makeDocContext(subPr, null, false);
+          const fullTree = buildSourceTree(data.law_full_text, subPr.sentenceNodes, subDocCtx);
+          subDocCtx.treeRoot = fullTree;
+          const [hitArtNum, hitArtSub] = splitArticleNum(hitArticle);
+          const clone = cloneCoordPreview({ articleNum: hitArtNum, articleSub: hitArtSub || null }, subDocCtx);
+          if (clone) {
+            appendStackFrame(stackBody, 'VIEW', '該当箇所をハイライトしました');
+            appendDefView(viewBody, top.revision_info.law_title + ' の参照内容(自動推定)', clone);
+          } else {
+            appendStackFrame(stackBody, 'VIEW', '該当条文の抽出に失敗しました');
           }
-          appendStackFrame(stackBody, 'VIEW', '該当箇所をハイライトしました');
-          appendDefView(viewBody, top.revision_info.law_title + ' の参照内容(自動推定)', tree);
         } else if (scored[0].score >= 2) {
           // 条文単位までは特定できなくても、題名の命名慣習または制定文への明記という
           // 強いシグナルがある命令は委任先そのものである確度が高いため、その内容を
@@ -743,8 +844,10 @@
           topReasonLabel = scored[0].reason || '';
           appendStackFrame(stackBody, 'VIEW', '条文単位までは特定できませんでしたが、' + topReasonLabel + 'ためこの命令を表示します');
           const data = await EgovApi.getLawData(top.law_info.law_id, {});
-          const pr = LP.parseLaw(data.law_full_text, {});
-          const tree = buildSourceTree(data.law_full_text, pr.sentenceNodes);
+          const subPr = LP.parseLaw(data.law_full_text, { lawId: data.law_info && data.law_info.law_id, lawTitle: data.revision_info && data.revision_info.law_title, lawNum: data.revision_info && data.revision_info.law_num });
+          const subDocCtx = makeDocContext(subPr, null, false);
+          const tree = buildSourceTree(data.law_full_text, subPr.sentenceNodes, subDocCtx);
+          subDocCtx.treeRoot = tree;
           const note = document.createElement('div');
           note.className = 'defViewLawInfo';
           note.textContent = '委任元の条項に対応する具体的な条文までは特定できていません(' + topReasonLabel + 'のみ)。';
@@ -792,8 +895,10 @@
       li.addEventListener('click', async () => {
         li.classList.add('tok-selected');
         const data = await EgovApi.getLawData(l.law_info.law_id, {});
-        const pr = LP.parseLaw(data.law_full_text, {});
-        const tree = buildSourceTree(data.law_full_text, pr.sentenceNodes);
+        const pr = LP.parseLaw(data.law_full_text, { lawId: data.law_info && data.law_info.law_id, lawTitle: data.revision_info && data.revision_info.law_title, lawNum: data.revision_info && data.revision_info.law_num });
+        const subDocCtx = makeDocContext(pr, null, false);
+        const tree = buildSourceTree(data.law_full_text, pr.sentenceNodes, subDocCtx);
+        subDocCtx.treeRoot = tree;
         viewBody.innerHTML = '';
         appendDefView(viewBody, l.revision_info.law_title + ' の内容', tree);
       });
@@ -807,7 +912,7 @@
 
   // 被参照法令側の「(略称)第N条第M項の◯◯令で定める…は、」のような後方参照文言を
   // 検索し、委任元の条項に対応する具体的な条を特定する。
-  async function findBackReferenceArticle(lawIdOrNum, baseLawTitle, articleNum, paragraphNum, ministryPhrase) {
+  async function findBackReferenceArticle(lawIdOrNum, baseLawTitle, articleNum, paragraphNum, itemNum, ministryPhrase) {
     const artKanji = LP.intToKanji(parseInt(articleNum, 10));
     if (!artKanji) return null;
     let data;
@@ -836,16 +941,23 @@
     })(data.law_full_text);
 
     const targetPara = paragraphNum ? parseInt(paragraphNum, 10) : null;
+    const targetItem = itemNum ? parseInt(itemNum, 10) : null;
     const suffixOptions = [];
     if (ministryPhrase) suffixOptions.push(escapeRegexForSearch(ministryPhrase) + 'で定める');
     suffixOptions.push('(?:省令|府令|規則|政令|条例)で定める');
 
     const lawNumOptional = '(?:（(?:明治|大正|昭和|平成|令和)[〇一二三四五六七八九十百千0-9]+年[^（）]{0,20}?第[〇一二三四五六七八九十百千0-9]+号）)?';
+    // 条・項が一致する候補が複数見つかった場合(例:1つの条にいくつもの号が定義され、
+    // 号ごとに別々の委任先条文があるケース)は、号番号まで一致するものを優先する。
+    // 号番号が一致しない場合でも即座に諦めず、号の指定が無い後方参照(条・項一致のみ)を
+    // 次点候補として保持しておき、号一致の候補が最後まで見つからなければそれを返す。
+    let fallback = null;
     for (const suffix of suffixOptions) {
       for (const prefix of prefixes) {
         const re = new RegExp(
           escapeRegexForSearch(prefix) + lawNumOptional + '第' + artKanji + '条(?!の[〇一二三四五六七八九十百千0-9])' +
           '(第([〇一二三四五六七八九十百千0-9]+)項)?' +
+          '(第([〇一二三四五六七八九十百千0-9]+)号)?' +
           '[^。]{0,40}?' + suffix,
           'g'
         );
@@ -858,14 +970,18 @@
             guard++;
             if (guard > 1000) break;
             const foundPara = m[2] ? LP.kanjiToInt(m[2]) : null;
-            if (!targetPara || !foundPara || foundPara === targetPara) {
-              return artNode.attr && artNode.attr.Num;
+            const foundItem = m[4] ? LP.kanjiToInt(m[4]) : null;
+            if ((!targetPara || !foundPara || foundPara === targetPara)) {
+              if (!targetItem || !foundItem || foundItem === targetItem) {
+                return artNode.attr && artNode.attr.Num;
+              }
+              if (!fallback) fallback = artNode.attr && artNode.attr.Num;
             }
           }
         }
       }
     }
-    return null;
+    return fallback;
   }
 
   function jumpToCoord(coord) {
@@ -889,6 +1005,7 @@
   // スコープ パネル
   // -----------------------------------------------------------------------
   function showScopeAt(node) {
+    activateDrawerTab('scope');
     document.getElementById('scopeCoordLabel').textContent = LP.describeCoord(node.coord);
     const body = document.getElementById('scopeBody');
     body.innerHTML = '';
@@ -899,7 +1016,7 @@
     }
     const groups = new Map();
     active.forEach((s) => {
-      const label = s.scope.type === 'law' ? '法令全体' : s.scope.type === 'fromHere' ? 'この地点以降' : s.scope.type === 'article' ? 'この条のみ' : s.scope.type;
+      const label = s.scope.type === 'law' ? '法令全体' : s.scope.type === 'fromHere' ? '定義箇所の条内、及びそれ以降' : s.scope.type === 'article' ? 'この条のみ' : s.scope.type === 'multi' ? '限定された複数箇所' : s.scope.type;
       if (!groups.has(label)) groups.set(label, []);
       groups.get(label).push(s);
     });
@@ -982,7 +1099,7 @@
       parseResult.externalLawRefs.forEach((r) => {
         const tr = document.createElement('tr');
         tr.innerHTML = '<td>' + escapeHtml(r.lawName) + '</td><td>' + escapeHtml(r.lawNum || '(番号記載なし)') + '</td>';
-        tr.addEventListener('click', () => openExternalLaw(r.lawName, r.lawNum));
+        tr.addEventListener('click', () => openExternalLawInNewTab(r.lawName, r.lawNum));
         t.appendChild(tr);
       });
       extBody.appendChild(t);
@@ -1013,12 +1130,15 @@
 
       const parseResult = LP.parseLaw(data.law_full_text, { lawId, lawTitle: info.law_title, lawNum: info.law_num });
       state.parseResult = parseResult;
+      const mainDocCtx = makeDocContext(parseResult, sourceBody, true);
+      state.mainDocCtx = mainDocCtx;
 
       document.getElementById('lawTitleDisplay').textContent = info.law_title || '(法令名不明)';
       document.getElementById('lawNumDisplay').textContent = info.law_num || '';
+      document.getElementById('lawTitleLink').href = 'https://laws.e-gov.go.jp/law/' + encodeURIComponent(lawId);
 
       sourceBody.innerHTML = '';
-      const tree = buildSourceTree(data.law_full_text, parseResult.sentenceNodes);
+      const tree = buildSourceTree(data.law_full_text, parseResult.sentenceNodes, mainDocCtx);
       sourceBody.appendChild(tree);
       renderToc(collectToc(data.law_full_text));
       renderDrawer(parseResult);
@@ -1037,17 +1157,19 @@
     }
   }
 
-  async function openExternalLaw(lawName, lawNum) {
-    if (state.currentIdOrNum) state.lawStack.push(state.currentIdOrNum);
-    try {
-      if (lawNum) {
-        await loadAndParse(lawNum, {});
-        return;
-      }
-      const results = await EgovApi.searchLaws({ law_title: lawName, limit: 5 });
+  // 外部法令を「今のタブを差し替えて」ではなく、新しいタブでこのデバッガー自体を
+  // 開いて独立に解析できるようにする。法令番号が既に分かっている場合は名称検索を
+  // 待たずに即座にタブを開く(非同期処理を挟むとポップアップブロックの対象に
+  // なりやすいため)。
+  function openExternalLawInNewTab(lawName, lawNum) {
+    if (lawNum) {
+      window.open('parserDebug.html#lawId=' + encodeURIComponent(lawNum), '_blank');
+      return;
+    }
+    EgovApi.searchLaws({ law_title: lawName, limit: 5 }).then((results) => {
       const best = results.find((r) => r.revision_info.law_title === lawName) || results[0];
-      if (best) await loadAndParse(best.law_info.law_id, {});
-    } catch (e) { /* ignore, keep current view */ }
+      if (best) window.open('parserDebug.html#lawId=' + encodeURIComponent(best.law_info.law_id), '_blank');
+    }).catch(() => { /* ignore */ });
   }
 
   // -----------------------------------------------------------------------
@@ -1080,7 +1202,6 @@
           div.addEventListener('click', () => {
             results.hidden = true;
             input.value = l.revision_info.law_title;
-            state.lawStack = [];
             loadAndParse(l.law_info.law_id, {});
           });
           results.appendChild(div);
@@ -1106,6 +1227,9 @@
         showCallStack(parseInt(tok.dataset.tokIdx, 10), fromLevelIndex);
         return;
       }
+      // スコープパネルはメイン文書の座標系(state.parseResult)を前提にしているため、
+      // 参照内容ビュー(サブ文書)内の段落クリックでは対応せず何もしない。
+      if (container.id !== 'sourceBody') return;
       const para = e.target.closest('.srcParagraph');
       if (para) {
         // 段落クリックでスコープパネルを更新するため、対応する座標を近似的に取得する
@@ -1113,7 +1237,7 @@
         const artEl = para.closest('details.srcArticle');
         if (artEl) {
           const [, rest] = artEl.dataset.articleKey.split(':');
-          const [artNum, artSub] = rest.split('_');
+          const [artNum, artSub] = splitArticleNum(rest);
           showScopeAt({ coord: { isSupplProvision: false, articleNum: artNum, articleSub: artSub || null, paragraphNum: coordKeyGuess }, seq: findSeqForCoord(artNum, artSub, coordKeyGuess) });
         }
       }
@@ -1131,6 +1255,28 @@
     return Number.MAX_SAFE_INTEGER;
   }
 
+  const DRAWER_TAB_PAGE_MAP = {
+    callstack: 'drawerCallstack', scope: 'drawerScope',
+    symbols: 'drawerSymbols', quasi: 'drawerQuasi', externals: 'drawerExternals'
+  };
+
+  // タブを切り替えて表示し、ドロワーが閉じていれば開く。トークン/本文クリック時に
+  // コールスタック・スコープタブへ自動で切り替えるためにも使う(プログラムからも呼べるよう
+  // クリックハンドラから分離してある)。
+  function activateDrawerTab(key) {
+    const drawer = document.getElementById('drawer');
+    const toggle = document.getElementById('drawerToggle');
+    const page = document.getElementById(DRAWER_TAB_PAGE_MAP[key]);
+    if (!page) return;
+    document.querySelectorAll('.drawerTab').forEach((t) => t.classList.toggle('active', t.dataset.tab === key));
+    document.querySelectorAll('.drawerPage').forEach((p) => { p.hidden = true; });
+    page.hidden = false;
+    if (drawer.classList.contains('collapsed')) {
+      drawer.classList.remove('collapsed');
+      toggle.textContent = '▼';
+    }
+  }
+
   function setupDrawer() {
     const drawer = document.getElementById('drawer');
     const toggle = document.getElementById('drawerToggle');
@@ -1139,18 +1285,7 @@
       toggle.textContent = drawer.classList.contains('collapsed') ? '▲' : '▼';
     });
     document.querySelectorAll('.drawerTab').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.drawerTab').forEach((t) => t.classList.remove('active'));
-        tab.classList.add('active');
-        document.querySelectorAll('.drawerPage').forEach((p) => { p.hidden = true; });
-        const key = tab.dataset.tab;
-        const map = { symbols: 'drawerSymbols', quasi: 'drawerQuasi', externals: 'drawerExternals' };
-        document.getElementById(map[key]).hidden = false;
-        if (drawer.classList.contains('collapsed')) {
-          drawer.classList.remove('collapsed');
-          toggle.textContent = '▼';
-        }
-      });
+      tab.addEventListener('click', () => activateDrawerTab(tab.dataset.tab));
     });
   }
 

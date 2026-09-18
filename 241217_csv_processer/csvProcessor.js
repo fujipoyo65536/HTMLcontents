@@ -117,10 +117,10 @@ document.addEventListener('DOMContentLoaded', function() {
 				tab.classList.remove('active');
 			});
 			previewPaneContents.forEach(function(content) {
-				content.style.display = 'none';
+				content.classList.remove('active');
 			});
 			tab.classList.add('active');
-			previewPaneContents[tabIndex].style.display = 'block';
+			previewPaneContents[tabIndex].classList.add('active');
 		});
 	});
 	previewPaneTabs[0].click();
@@ -133,10 +133,10 @@ document.addEventListener('DOMContentLoaded', function() {
 				tab.classList.remove('active');
 			});
 			codePaneContents.forEach(function(content) {
-				content.style.display = 'none';
+				content.classList.remove('active');
 			});
 			tab.classList.add('active');
-			codePaneContents[tabIndex].style.display = 'block';
+			codePaneContents[tabIndex].classList.add('active');
 		});
 	});
 	codePaneTabs[2].click();

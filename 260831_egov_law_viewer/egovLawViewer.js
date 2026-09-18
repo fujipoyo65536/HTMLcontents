@@ -105,7 +105,7 @@
   // 法令名候補として採用する。
   const CITATION_BOUNDARY_MARKERS = [
     'により', 'によって', 'によつて', 'に基づき', 'に基づいて',
-    'に従い', 'に従って', 'に応じて', 'に関し', 'に関して'
+    'に従い', 'に従って', 'に応じて', 'に関し', 'に関して', 'に係る'
   ];
   const SELF_REFERENCE_RE = /^(?:この|同|当該|前記|前項|前条|前号|次項|次条)/;
   const BARE_SUFFIX_ONLY_RE = new RegExp('^' + LAW_SUFFIX + '$');
@@ -340,42 +340,88 @@
     return matches.concat(extra);
   }
 
-  function scanSentenceText(text, ctx) {
+  // カッコ(全角「（）」・半角「()」)の中身を、カッコ自体を含めて入れ子の深さ順に
+  // 色分けする。日本語の法令文はカッコが何重にも入れ子になることが多く、
+  // どの閉じカッコがどの開きカッコに対応するか視覚的に分かりにくいための対応。
+  // トークン(引用・委任文言リンク)はカッコの深さ判定を跨いで途切れない「不可分な
+  // 一単位」として扱う(内部は解析せず素通しするが、開いている色の内側には正しく
+  // ネストされるため、カッコがトークンを挟んでも色が途切れない)。
+  const PAREN_COLOR_COUNT = 4;
+  function renderTextWithParenColors(text, matches, buildMatchEl) {
     const frag = document.createDocumentFragment();
-    const matches = collectMatches(text, ctx);
-    let pos = 0;
-    matches.forEach((m) => {
-      if (m.start > pos) frag.appendChild(document.createTextNode(text.slice(pos, m.start)));
-      if (m.type === 'explicit') {
-        const a = document.createElement('a');
-        a.className = 'ref-explicit';
-        a.href = '#';
-        a.textContent = m.text;
-        if (m.lawNum) a.dataset.lawNum = m.lawNum;
-        a.dataset.lawName = m.lawName;
-        const artNum = kanjiToInt(m.articleKanji);
-        const artSubNum = kanjiToInt(m.articleSubKanji);
-        const paraNum = kanjiToInt(m.paragraphKanji);
-        const itemNum = kanjiToInt(m.itemKanji);
-        if (artNum) a.dataset.article = String(artNum);
-        if (artSubNum) a.dataset.articleSub = String(artSubNum);
-        if (paraNum) a.dataset.paragraph = String(paraNum);
-        if (itemNum) a.dataset.item = String(itemNum);
-        frag.appendChild(a);
-      } else {
-        const span = document.createElement('span');
-        span.className = 'ref-delegate';
-        span.textContent = m.text;
-        span.dataset.baseLawTitle = (ctx && ctx.lawTitle) || '';
-        span.dataset.ministryPhrase = m.ministryPhrase;
-        span.dataset.articleNum = (ctx && ctx.currentArticleNum) || '';
-        span.dataset.paragraphNum = (ctx && ctx.currentParagraphNum) || '';
-        frag.appendChild(span);
+    const stack = [frag];
+    let plainStart = 0;
+    let depth = 0;
+    let mi = 0;
+    const flushPlain = (end) => {
+      if (end > plainStart) {
+        stack[stack.length - 1].appendChild(document.createTextNode(text.slice(plainStart, end)));
       }
-      pos = m.end;
-    });
-    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+    };
+    let i = 0;
+    while (i < text.length) {
+      if (mi < matches.length && matches[mi].start === i) {
+        flushPlain(i);
+        const m = matches[mi];
+        const el = buildMatchEl(m);
+        if (el) stack[stack.length - 1].appendChild(el);
+        i = m.end;
+        plainStart = i;
+        mi++;
+        continue;
+      }
+      const ch = text[i];
+      if (ch === '（' || ch === '(') {
+        flushPlain(i);
+        depth++;
+        const span = document.createElement('span');
+        span.className = 'parenLv' + (((depth - 1) % PAREN_COLOR_COUNT) + 1);
+        stack[stack.length - 1].appendChild(span);
+        stack.push(span);
+        plainStart = i;
+      } else if ((ch === '）' || ch === ')') && depth > 0) {
+        flushPlain(i + 1);
+        depth--;
+        stack.pop();
+        plainStart = i + 1;
+      }
+      i++;
+    }
+    flushPlain(text.length);
     return frag;
+  }
+
+  function buildMatchElement(m, ctx) {
+    if (m.type === 'explicit') {
+      const a = document.createElement('a');
+      a.className = 'ref-explicit';
+      a.href = '#';
+      a.textContent = m.text;
+      if (m.lawNum) a.dataset.lawNum = m.lawNum;
+      a.dataset.lawName = m.lawName;
+      const artNum = kanjiToInt(m.articleKanji);
+      const artSubNum = kanjiToInt(m.articleSubKanji);
+      const paraNum = kanjiToInt(m.paragraphKanji);
+      const itemNum = kanjiToInt(m.itemKanji);
+      if (artNum) a.dataset.article = String(artNum);
+      if (artSubNum) a.dataset.articleSub = String(artSubNum);
+      if (paraNum) a.dataset.paragraph = String(paraNum);
+      if (itemNum) a.dataset.item = String(itemNum);
+      return a;
+    }
+    const span = document.createElement('span');
+    span.className = 'ref-delegate';
+    span.textContent = m.text;
+    span.dataset.baseLawTitle = (ctx && ctx.lawTitle) || '';
+    span.dataset.ministryPhrase = m.ministryPhrase;
+    span.dataset.articleNum = (ctx && ctx.currentArticleNum) || '';
+    span.dataset.paragraphNum = (ctx && ctx.currentParagraphNum) || '';
+    return span;
+  }
+
+  function scanSentenceText(text, ctx) {
+    const matches = collectMatches(text, ctx);
+    return renderTextWithParenColors(text, matches, (m) => buildMatchElement(m, ctx));
   }
 
   // ---------------------------------------------------------------------

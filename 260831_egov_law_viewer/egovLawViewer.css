@@ -274,6 +274,14 @@ details[open] > summary::before {
   margin: 2px 0 2px 1.6em;
 }
 
+/* カッコの入れ子の深さごとの色分け(カッコ自体も含めて色付け)。
+   色弱でも判別しやすいよう、Okabe-Ito配色(カラーユニバーサルデザインで
+   広く使われる、色覚特性によらず区別しやすい配色)から採用している。 */
+.parenLv1 { color: #D55E00; } /* 朱色 */
+.parenLv2 { color: #0072B2; } /* 青 */
+.parenLv3 { color: #009E73; } /* 青緑 */
+.parenLv4 { color: #CC79A7; } /* 赤紫 */
+
 .supplProvision {
   margin-top: 36px;
   padding-top: 12px;

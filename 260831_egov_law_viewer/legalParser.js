@@ -86,6 +86,14 @@
     return (c.isSupplProvision ? 'S' : 'M') + ':' + (c.articleNum || '') + '_' + (c.articleSub || '');
   }
 
+  // 枝番号(articleSub/itemSub)は「2」だけでなく「2_3」(の二の三、二段階以上の
+  // 枝分かれ)のこともあるため、'_'区切りの各セグメントを個別に漢数字化して
+  // 「の◯の◯」と連結する。
+  function describeBranchSuffix(sub) {
+    if (!sub) return '';
+    return String(sub).split('_').map((seg) => 'の' + (intToKanji(parseInt(seg, 10)) || seg)).join('');
+  }
+
   function describeCoord(c) {
     if (!c) return '(不明)';
     let s = c.isSupplProvision ? '附則' : '';
@@ -94,12 +102,12 @@
     }
     if (c.articleNum) {
       const a = intToKanji(parseInt(c.articleNum, 10));
-      s += '第' + (a || c.articleNum) + '条' + (c.articleSub ? 'の' + (intToKanji(parseInt(c.articleSub, 10)) || c.articleSub) : '');
+      s += '第' + (a || c.articleNum) + '条' + describeBranchSuffix(c.articleSub);
     }
     if (c.paragraphNum) s += '第' + c.paragraphNum + '項';
     if (c.itemNum) {
       const i = intToKanji(parseInt(c.itemNum, 10));
-      s += '第' + (i || c.itemNum) + '号' + (c.itemSub ? 'の' + (intToKanji(parseInt(c.itemSub, 10)) || c.itemSub) : '');
+      s += '第' + (i || c.itemNum) + '号' + describeBranchSuffix(c.itemSub);
     }
     return s || (c.isSupplProvision ? '附則冒頭' : '法令冒頭');
   }
@@ -114,14 +122,24 @@
   ]);
   for (let i = 1; i <= 10; i++) LEAF_TEXT_TAGS.add('Subitem' + i + 'Title');
 
+  // Num属性は「1」「1_2」だけでなく「1_2_3」(第一条の二の三)のように二段階以上
+  // 枝分かれすることがある。parts[1]だけを取ると「1_2」(第一条の二)と「1_2_3」
+  // (第一条の二の三)が同じ座標(articleNum:1, articleSub:2)になり区別できなくなる
+  // ため、枝番号側は最初の'_'より後ろを丸ごと保持する。
   function splitNum(numStr) {
     if (!numStr) return [null, null];
-    const parts = String(numStr).split('_');
-    return [parts[0], parts[1] || null];
+    const s = String(numStr);
+    const idx = s.indexOf('_');
+    if (idx === -1) return [s, null];
+    return [s.slice(0, idx), s.slice(idx + 1)];
   }
 
   function flattenToSentenceNodes(root) {
     const nodes = [];
+    // 号の本文が「用語｜定義」の2列(Column)構成になっている場合(道路交通法第二条の
+    // ような定義列挙条文でよく見られる形式)を検出しておく。「以下「◯◯」という。」の
+    // ような明示句が本文中に無くても、この構造自体が実質的な定義とみなせるため。
+    const columnDefs = [];
     let ctx = emptyCoord();
     let seq = 0;
 
@@ -179,7 +197,18 @@
         }
         case 'Item': {
           const [it, isub] = splitNum(node.attr && node.attr.Num);
-          withCtx({ itemNum: it, itemSub: isub }, () => (node.children || []).forEach(walk));
+          withCtx({ itemNum: it, itemSub: isub }, () => {
+            const itemSentence = (node.children || []).find((c) => c && c.tag === 'ItemSentence');
+            const columns = itemSentence ? (itemSentence.children || []).filter((c) => c && c.tag === 'Column') : [];
+            if (columns.length === 2) {
+              const term = textOf(columns[0]).trim();
+              const definition = textOf(columns[1]).trim();
+              if (term && /(?:という|をいう)。?$/.test(definition)) {
+                columnDefs.push({ alias: term, definitionText: definition, coord: ctx, seq });
+              }
+            }
+            (node.children || []).forEach(walk);
+          });
           return;
         }
         default:
@@ -192,7 +221,7 @@
       }
     }
     walk(root);
-    return nodes;
+    return { nodes, columnDefs };
   }
 
   // -----------------------------------------------------------------------
@@ -200,11 +229,15 @@
   // -----------------------------------------------------------------------
   const SCOPE_DEF_RE = /この(法律|政令|省令|規則|条例|章|節|款|条|項)(?:において|で)、?「([^」]+)」とは、(.+?)を(?:いう|いいます)。/g;
   const ALIAS_DEF_RE = /(?:([^、。\s]{1,60}?))(?:を)?\(?（(?:以下)?(?:単に)?「([^」]+)」という。?\)?）/g;
+  // 「（以下この条及び次条第一項において「歩道等」という。）」のように、「以下」と
+  // 引用符の間に有効範囲を限定する句が挟まるパターン。ALIAS_DEF_REは「以下」の直後に
+  // (単に)を挟んですぐ引用符が来る形しか許容していないため、これとは別に検出する。
+  const SCOPE_QUALIFIED_ALIAS_RE = /以下([^「」（）]{1,40}?)において「([^」]+)」という。?/g;
   const SORE_IZURE_ONAJI_RE = /以下同じ。/g;
 
   let symbolIdCounter = 0;
 
-  function buildSymbolTable(sentenceNodes) {
+  function buildSymbolTable(sentenceNodes, columnDefs) {
     const table = [];
 
     sentenceNodes.forEach((node) => {
@@ -238,10 +271,29 @@
         });
       }
 
+      SCOPE_QUALIFIED_ALIAS_RE.lastIndex = 0;
+      while ((m = SCOPE_QUALIFIED_ALIAS_RE.exec(text))) {
+        const alias = m[2];
+        if (table.some((s) => s.definedAtSeq === node.seq && s.alias === alias)) continue;
+        const scope = parseScopeQualifier(m[1], node.coord);
+        table.push({
+          id: 'sym' + (symbolIdCounter++),
+          alias,
+          definitionText: null,
+          // 範囲句を解釈できた場合はその範囲のみ、できなければ安全側(従来通り
+          // 定義箇所から法令末尾まで)にフォールバックする。
+          scope: scope || { type: 'fromHere' },
+          definedAtCoord: node.coord,
+          definedAtSeq: node.seq,
+          sourceText: text,
+          kind: 'alias-definition'
+        });
+      }
+
       ALIAS_DEF_RE.lastIndex = 0;
       while ((m = ALIAS_DEF_RE.exec(text))) {
         const alias = m[2];
-        // SCOPE_DEF_RE で既に登録済みの用語は二重登録しない
+        // SCOPE_DEF_RE / SCOPE_QUALIFIED_ALIAS_RE で既に登録済みの用語は二重登録しない
         if (table.some((s) => s.definedAtSeq === node.seq && s.alias === alias)) continue;
         table.push({
           id: 'sym' + (symbolIdCounter++),
@@ -270,6 +322,23 @@
       }
     });
 
+    // 号の「用語｜定義」列(Column)構成から検出した定義も、通常のalias-definitionと
+    // 同じ扱いでシンボルテーブルに加える。同じ語句が既に(「以下「」という」等で)
+    // 登録済みならそちらを優先し、二重登録はしない。
+    (columnDefs || []).forEach((cd) => {
+      if (table.some((s) => s.alias === cd.alias)) return;
+      table.push({
+        id: 'sym' + (symbolIdCounter++),
+        alias: cd.alias,
+        definitionText: cd.definitionText,
+        scope: { type: 'fromHere' },
+        definedAtCoord: cd.coord,
+        definedAtSeq: cd.seq,
+        sourceText: cd.definitionText,
+        kind: 'alias-definition'
+      });
+    });
+
     return table;
   }
 
@@ -285,8 +354,27 @@
       case 'article':
         return coord.isSupplProvision === symbol.scope.isSupplProvision &&
           coord.articleNum === symbol.scope.articleNum && coord.articleSub === symbol.scope.articleSub;
-      case 'fromHere':
-        return coord.isSupplProvision === symbol.definedAtCoord.isSupplProvision && seq >= symbol.definedAtSeq;
+      case 'multi':
+        // 「この条及び次条第一項」のように複数箇所に限定された範囲。いずれか1つに
+        // 一致すれば有効(paragraphNumが指定されている部分は、その項の中でのみ有効)。
+        return symbol.scope.parts.some((part) =>
+          coord.isSupplProvision === part.isSupplProvision &&
+          String(coord.articleNum || '') === String(part.articleNum || '') &&
+          String(coord.articleSub || '') === String(part.articleSub || '') &&
+          (part.paragraphNum == null || String(coord.paragraphNum || '') === String(part.paragraphNum))
+        );
+      case 'fromHere': {
+        // 「以下同じ。」等の明示的な範囲指定が無い場合のデフォルト解釈。
+        // 定義箇所からこの法令の末尾までは通常どおり有効とする一方、定義箇所と
+        // 同じ条の中であれば、定義文より前(号の並びの順序によらない前方参照)でも
+        // 有効とみなす。道路交通法第二条(定義)のように、号どうしが互いに定義済み
+        // 語句を先取りして参照し合う条文があるため。
+        if (coord.isSupplProvision !== symbol.definedAtCoord.isSupplProvision) return false;
+        const sameArticle = coord.articleNum === symbol.definedAtCoord.articleNum &&
+          coord.articleSub === symbol.definedAtCoord.articleSub;
+        if (sameArticle) return true;
+        return seq >= symbol.definedAtSeq;
+      }
       default:
         return false;
     }
@@ -298,7 +386,11 @@
       case 'chapter': return '第' + (intToKanji(parseInt(scope.chapterNum, 10)) || scope.chapterNum) + '章の中のみ';
       case 'section': return '当該節の中のみ';
       case 'article': return describeCoord({ isSupplProvision: scope.isSupplProvision, articleNum: scope.articleNum, articleSub: scope.articleSub }) + 'の中のみ';
-      case 'fromHere': return '定義箇所からこの法令の末尾まで';
+      case 'multi':
+        return scope.parts.map((p) => describeCoord({
+          isSupplProvision: p.isSupplProvision, articleNum: p.articleNum, articleSub: p.articleSub, paragraphNum: p.paragraphNum
+        })).join('・') + 'の中のみ';
+      case 'fromHere': return '定義箇所の条内は前後を問わず、それ以外は定義箇所からこの法令の末尾まで';
       default: return '(不明)';
     }
   }
@@ -311,6 +403,41 @@
   const LAW_SUFFIX = '(?:法律|規則|規程|条例|政令|省令|府令|令|法)';
   const LAW_SUFFIX_END_RE = new RegExp(LAW_SUFFIX + '$');
   const KANJI_ONLY = '[\\u4E00-\\u9FFF々〇]';
+
+  // 「以下この条及び次条第一項において「歩道等」という。」のように、略称の有効範囲が
+  // 明示的に限定されている場合の範囲句をパースする。「この条」「次条」「前条」「第◯条」
+  // (いずれも「の◯」枝番号可)に、任意で「第◯項」が付いた単位を「、」「及び」「並びに」
+  // で連結した列挙のみに対応する(それ以外の複雑な範囲句はfromHereへフォールバックする)。
+  const SCOPE_UNIT_RE = new RegExp(
+    '^(?:(この)条|(次)条|(前)条|第(' + KANJI_NUM + ')条(?:の(' + KANJI_NUM + '))?)' +
+    '(?:第(' + KANJI_NUM + ')項)?$'
+  );
+  function resolveScopeUnit(unitText, coord) {
+    const m = SCOPE_UNIT_RE.exec(unitText.trim());
+    if (!m) return null;
+    let articleNum = null;
+    let articleSub = null;
+    if (m[1]) { // この条
+      articleNum = coord.articleNum;
+      articleSub = coord.articleSub;
+    } else if (m[2]) { // 次条 (枝番号の間にある可能性は考慮しない簡易近似)
+      articleNum = coord.articleNum ? String(parseInt(coord.articleNum, 10) + 1) : null;
+    } else if (m[3]) { // 前条
+      articleNum = coord.articleNum ? String(parseInt(coord.articleNum, 10) - 1) : null;
+    } else if (m[4]) { // 第◯条(の◯)?
+      articleNum = String(kanjiToInt(m[4]));
+      articleSub = m[5] ? String(kanjiToInt(m[5])) : null;
+    }
+    if (!articleNum) return null;
+    const paragraphNum = m[6] ? kanjiToInt(m[6]) : null;
+    return { articleNum, articleSub, paragraphNum, isSupplProvision: coord.isSupplProvision };
+  }
+  function parseScopeQualifier(qualifierText, coord) {
+    const rawUnits = qualifierText.split(/、|及び|並びに/).map((s) => s.trim()).filter(Boolean);
+    const parts = rawUnits.map((u) => resolveScopeUnit(u, coord)).filter(Boolean);
+    if (!parts.length || parts.length !== rawUnits.length) return null; // 一部でも解釈できなければ不採用
+    return { type: 'multi', parts };
+  }
 
   // 委任文言の「◯◯省令」等は列挙で厳密にマッチさせる。可変長の前方一致は
   // 正規表現の最左マッチの性質上、直前の無関係な語句まで巻き込むことがあるため。
@@ -387,7 +514,7 @@
   // 法令名候補として採用する。
   const CITATION_BOUNDARY_MARKERS = [
     'により', 'によって', 'によつて', 'に基づき', 'に基づいて',
-    'に従い', 'に従って', 'に応じて', 'に関し', 'に関して'
+    'に従い', 'に従って', 'に応じて', 'に関し', 'に関して', 'に係る'
   ];
   const SELF_REFERENCE_RE = /^(?:この|同|当該|前記)/;
   const BARE_SUFFIX_ONLY_RE = new RegExp('^' + LAW_SUFFIX + '$');
@@ -967,8 +1094,8 @@
   // 7. エントリポイント
   // -----------------------------------------------------------------------
   function parseLaw(lawFullTextTree, lawMeta) {
-    const sentenceNodes = flattenToSentenceNodes(lawFullTextTree);
-    const symbolTable = buildSymbolTable(sentenceNodes);
+    const { nodes: sentenceNodes, columnDefs } = flattenToSentenceNodes(lawFullTextTree);
+    const symbolTable = buildSymbolTable(sentenceNodes, columnDefs);
     const { externalLawRefs } = resolveDocument(sentenceNodes, symbolTable, lawMeta);
     const quasiApplications = detectQuasiApplications(sentenceNodes);
 
