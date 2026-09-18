@@ -58,7 +58,7 @@ label:hover{
 
 .tooltip{
   display: inline-block;
-  /* position: relative; */
+  position: relative;
   cursor: help;
   margin: 1px;
   height: 1.5em;
@@ -72,12 +72,17 @@ label:hover{
 
 .tooltipText{
   display: none;
-  position: absolute;
+  /* position:fixedにすることで、#settingPane内の狭いスクロール領域(.subPaneのoverflow:auto)による
+     見切れを回避する。実際のtop/leftはJS側(csvProcessor.js)でアイコンの位置を見て
+     画面内に収まるように動的に計算する。 */
+  position: fixed;
+  width: min(300px, 90vw);
   text-align: left;
   background-color: #FFF;
   border: 1px solid #000;
   padding: 5px;
-  z-index: 100;
+  z-index: 1000;
+  box-sizing: border-box;
 }
 
 .tooltip:hover .tooltipText{

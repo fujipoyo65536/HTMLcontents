@@ -107,7 +107,42 @@ document.addEventListener('DOMContentLoaded', function() {
 		csvProcessor.editors.outputFileNameCode.setValue('return ["output.csv"]');
 	}
 
-	
+
+	// tooltip関係
+	// #settingPane内の狭いスクロール領域(.subPane)により見切れることがあるため、
+	// position:fixedにした上で、アイコンの実際の画面上の位置を見て、はみ出さない位置に動的配置する
+	document.querySelectorAll('.tooltip').forEach(function(tooltip){
+		const tooltipText = tooltip.querySelector('.tooltipText');
+		if(!tooltipText)return;
+		tooltip.addEventListener('mouseenter', function(){
+			const margin = 4;
+			const iconRect = tooltip.getBoundingClientRect();
+
+			// 表示状態にして実際のサイズを測る(測り終わったら一旦戻す)
+			tooltipText.style.display = 'block';
+			const textRect = tooltipText.getBoundingClientRect();
+			tooltipText.style.display = '';
+
+			// 既定はアイコンの右端を起点に左側へ広げる。画面外に出る場合はアイコンの左端を起点に右側へ広げる
+			let left = iconRect.right - textRect.width;
+			if(left < margin){
+				left = iconRect.left;
+			}
+			left = Math.min(left, window.innerWidth - textRect.width - margin);
+			left = Math.max(left, margin);
+
+			// 既定はアイコンの下側に表示。画面外に出る場合は上側に表示
+			let top = iconRect.bottom;
+			if(top + textRect.height > window.innerHeight - margin){
+				top = iconRect.top - textRect.height;
+			}
+			top = Math.max(top, margin);
+
+			tooltipText.style.left = `${left}px`;
+			tooltipText.style.top = `${top}px`;
+		});
+	});
+
 	// タブ関係
 	const previewPaneTabs = document.querySelectorAll('#previewPaneTabBox>.tab');
 	const previewPaneContents = document.querySelectorAll('#previewPaneContentBox>.tabContent');
