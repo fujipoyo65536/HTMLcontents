@@ -428,6 +428,13 @@ width: calc(80% - 10px);
 #outputButton:hover{
   background-color: #FEE;
 }
+#outputButton.processing{
+  background-color: #FCC;
+  border-color: #900;
+}
+#outputButton.processing:hover{
+  background-color: #FAA;
+}
 
 #outputStatusTextBox{
   margin: 10px 0;

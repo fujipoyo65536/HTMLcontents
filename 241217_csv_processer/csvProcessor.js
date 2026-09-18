@@ -281,9 +281,24 @@ document.addEventListener('DOMContentLoaded', function() {
 	// 出力ボタン
 	const outputButton = document.getElementById('outputButton');
 	outputButton.addEventListener('click', async function(){
+		// 処理中は、このボタンは「中止」ボタンとして働く
+		if(csvProcessor.isProcessing){
+			if(!confirm("本当に処理を中止しますか？\n出力中のファイルは破棄されます。"))return;
+			csvProcessor.processAbortController.abort();
+			return;
+		}
 		// csvProcessor.processAll();
 		document.querySelectorAll('#codePaneTabBox>.tab')[5].click();
-		csvProcessor.processAllStream();
+		csvProcessor.isProcessing = true;
+		outputButton.textContent = "中止";
+		outputButton.classList.add('processing');
+		try{
+			await csvProcessor.processAllStream();
+		}finally{
+			csvProcessor.isProcessing = false;
+			outputButton.textContent = "START";
+			outputButton.classList.remove('processing');
+		}
 	});
 	
 	// プロファイル系
@@ -761,7 +776,10 @@ const csvProcessor = {
 		csvProcessor.sessionMemory = {};
 		csvProcessor.inputRowCount = 0;
 		csvProcessor.headerArray = undefined;
-		
+		// 強制中断用。チャンク単位・ファイル単位でこのsignalを確認し、中断時は出力ファイルを破棄する
+		csvProcessor.processAbortController = new AbortController();
+		const abortSignal = csvProcessor.processAbortController.signal;
+
 		if(!csvProcessor.outputDirectoryHandle){
 			csvProcessor.dialog("出力ディレクトリが選択されていません。");
 			csvProcessor.addLogText("output","出力ディレクトリが選択されていないため処理中断");
@@ -844,6 +862,9 @@ const csvProcessor = {
 		}
 		//Inputファイルごとループ
 		for(const [csvIndex,file] of csvProcessor.inputFiles.entries()){
+			if(abortSignal.aborted){
+				break;
+			}
 			const csvArrayAfterProcess = await csvProcessor.processCsvStream(csvIndex);
 			// 処理方法が「入力ファイルごとに書き込み」の場合、ここでファイル書き込み処理を行う
 			if(options.outputWritingTiming == "input"){
@@ -854,9 +875,17 @@ const csvProcessor = {
 			csvProcessor.inputFileTextObj = null;
 			csvProcessor.inputFileText = "";
 		}// inputFileごと
-		await csvProcessor.closeAllOutputStream();
-		console.log("processAll Finished");
-		csvProcessor.addLogText("output","すべての処理が完了");
+
+		if(abortSignal.aborted){
+			// 中止時は出力ファイルを破棄する(そこまで書き込んだ内容は反映しない)
+			await csvProcessor.abortAllOutputStream();
+			console.log("processAll Aborted");
+			csvProcessor.addLogText("output","ユーザーの操作により処理を中止しました（出力ファイルは破棄されました）");
+		}else{
+			await csvProcessor.closeAllOutputStream();
+			console.log("processAll Finished");
+			csvProcessor.addLogText("output","すべての処理が完了");
+		}
 	},
 	
 	processCsvStream: async(csvIndex)=>{
@@ -884,6 +913,11 @@ const csvProcessor = {
 			let effectiveEncoding = options.inputEncoding;
 
 			while (true) {
+				// 強制中断のチェック(チャンク単位)
+				if(csvProcessor.processAbortController.signal.aborted){
+					console.log("processCsvStream Aborted:",csvIndex);
+					break;
+				}
 				console.log("chunk load start Index:",streamIndex);
 				let done,value;
 				if(!csvProcessor.options.inputLoadOnce){//通常のチャンク読み込み
@@ -1313,6 +1347,23 @@ const csvProcessor = {
 		}
 	},
 	
+	abortAllOutputStream: async()=>{
+		// 強制中断時、開いている出力ファイルをすべて破棄する。
+		// FileSystemWritableFileStreamはclose()するまで実際のファイルに反映されないため、
+		// close()せずabort()することで、それまでの書き込み内容ごと破棄される。
+		if(!csvProcessor.outputFiles)return;
+		for(const [outputFileFullName,outputFile] of Object.entries(csvProcessor.outputFiles)){
+			if(outputFile.writeableStream){
+				try{
+					await outputFile.writeableStream.abort("処理が中止されました");
+				}catch(e){
+					console.error(`出力ファイルの破棄に失敗しました: ${outputFileFullName}`,e);
+				}
+			}
+		}
+		csvProcessor.outputFiles = {};
+	},
+
 	closeOutputStream: async (outputFileFullName) => {
 		if(!csvProcessor.outputFiles[outputFileFullName].writeableStream){
 			return;
