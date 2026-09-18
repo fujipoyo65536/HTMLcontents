@@ -1153,6 +1153,19 @@ const csvProcessor = {
 		return csvArray;
 	},
 	
+	getOrCreateFileHandleForPath: async (baseDirectoryHandle,filePath)=>{
+		// "/"区切りのパスを解釈し、必要なフォルダを作成しながら辿って、最終的なファイルハンドルを返す。
+		// (FileSystemDirectoryHandle.getFileHandle/getDirectoryHandleは1階層分の名前しか受け付けないため、
+		//  "サブフォルダ/output.csv"のようなファイル名をそのまま渡すと失敗する)
+		const segments = filePath.split('/').filter((segment)=>segment !== '');
+		let directoryHandle = baseDirectoryHandle;
+		for(let i = 0; i < segments.length-1; i++){
+			directoryHandle = await directoryHandle.getDirectoryHandle(segments[i], {create: true});
+		}
+		const fileName = segments[segments.length-1];
+		return await directoryHandle.getFileHandle(fileName, {create: true});
+	},
+
 	getWriteableStream: async (outputFileFullName) => {
 		let writeableStream;
 		let tmpOutputText = ""; //今すぐ書き出すテキスト
@@ -1167,7 +1180,7 @@ const csvProcessor = {
 			// なければ作成
 			console.log("File creating",outputFileFullName);
 			csvProcessor.addLogText("output",`ファイル作成中: ${outputFileFullName}`);
-			const fileHandle = await csvProcessor.outputDirectoryHandle.getFileHandle(outputFileFullName, {create: true});
+			const fileHandle = await csvProcessor.getOrCreateFileHandleForPath(csvProcessor.outputDirectoryHandle, outputFileFullName);
 			writeableStream = await fileHandle.createWritable();
 			console.log("File created",outputFileFullName);
 			csvProcessor.addLogText("output",`ファイル作成完了: ${outputFileFullName}`);
