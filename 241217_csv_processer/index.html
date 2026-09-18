@@ -92,7 +92,6 @@
 						<div class="previewSection">
 							<label class="optionBox">文字数リミット : <input type="number" id="inputPreviewCharLimitInput" value="1000"
 									style="width: 5em;">文字</label><br>
-							<span id="readingModeView">処理モードを表示</span><!-- ★ -->
 							<div id="inputPreviewBox">
 								<table id="inputPreviewTable"></table>
 							</div>
@@ -331,13 +330,6 @@
 											「〇M文字ごと」は行数ではなく、書き込み予定データの文字数(概算)を基準にフラッシュします。列数や1セルの文字数がバラつくデータでは、行数基準より安定してメモリ使用量を抑えられます。
 										</div>
 									</div>
-								</td>
-							</tr>
-							<tr>
-								<th>ファイル分割<div class="tooltip">！<div class="tooltipText">未対応(将来対応予定)</div></th>
-																<td>
-									<input type="checkbox" id="outputSplitCheckbox" data-option="outputSplit" disabled>ファイルを指定行数ごとに分割する<br>
-									分割行数 : <input type="number" id="outputMaxRowsInput" value="0" style="width: 5em;" data-option="outputMaxRows" disabled>行
 								</td>
 							</tr>
 							<tr>

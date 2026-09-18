@@ -1,21 +1,5 @@
 'use strict';
 
-// ●現状の問題
-// BOMをうまく扱えない
-// 複雑なCSVが読めなくなっている気がする
-// プレビュー周りの実装が全体的によくない。文字コードを選択するとエラーになる。
-// 文字コード自動判定も動いているのか怪しい
-// 各テキスト欄が長いとレイアウトが崩れる
-
-// ●todo
-// カスタム改行文字に対応
-// tooltip
-// 列数が合わない行の扱い
-// UI調整 折りたたみ
-// ディレクトリの書き出し
-// プロファイル読込・書き出しの改善・削除機能
-// 強制的な処理の打ち切り
-
 // ●やる気がないもの
 // perProcessFuncを追加 →使い道が思いつかないので保留
 // 累積出力行数
@@ -301,7 +285,6 @@ document.addEventListener('DOMContentLoaded', function() {
 			csvProcessor.processAbortController.abort();
 			return;
 		}
-		// csvProcessor.processAll();
 		document.querySelectorAll('#codePaneTabBox>.tab')[5].click();
 		csvProcessor.isProcessing = true;
 		outputButton.textContent = "中止";
@@ -464,329 +447,12 @@ const csvProcessor = {
 		
 	},
 	
-	processAll: async()=>{
-		console.log("processAll Started");
-		csvProcessor.addLogText("output","処理開始");
-		
-		const options = csvProcessor.getOptionsFromHtml();
-		csvProcessor.options = options;
-		csvProcessor.headerText = null;
-		
-		if(!csvProcessor.outputDirectoryHandle){
-			csvProcessor.dialog("出力ディレクトリが選択されていません。");
-			csvProcessor.addLogText("output","出力ディレクトリが選択されていないため処理中断");
-			return;
-		}
-		
-		let lineBreak
-		switch(options.outputLineBreakSelect){
-			case 'LF':
-			csvProcessor.options.outputLineBreak = '\n';
-			break;
-			case 'CR':
-			csvProcessor.options.outputLineBreak = '\r';
-			break;
-			case 'CRLF':
-			csvProcessor.options.outputLineBreak = '\r\n';
-			break;
-			default:
-			csvProcessor.options.outputLineBreak = '\n';
-			break;
-		}
-		
-		// ユーザー関数の準備
-		// 入力ファイルごとに実行する処理
-		{
-			let perInputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perInputCode']").value);
-			if(typeof perInputFunc === 'function'){
-				csvProcessor.perInputFunc = perInputFunc;
-				csvProcessor.perInputFuncFlag = true;
-			}else if(typeof perInputFunc === 'string'){
-				csvProcessor.perInputFunc = undefined;
-				console.log("入力ファイルごとに実行する処理は定義されませんでした",perInputFunc);
-				csvProcessor.perInputFuncFlag = false;
-			}
-			
-			// 行ごとに実行する処理
-			let perRowFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perRowCode']").value);
-			if(typeof perRowFunc === 'function'){
-				csvProcessor.perRowFunc = perRowFunc;
-				csvProcessor.perRowFuncFlag = true;
-			}else if(typeof perRowFunc === 'string'){
-				csvProcessor.perRowFunc = undefined;
-				console.log("行ごとに実行する処理は定義されませんでした",perRowFunc);
-				csvProcessor.perRowFuncFlag = false;
-			}
-			
-			// セルごとに実行する処理
-			let perCellFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perCellCode']").value);
-			if(typeof perCellFunc === 'function'){
-				csvProcessor.perCellFunc = perCellFunc;
-				csvProcessor.perCellFuncFlag = true;
-			}else if(typeof perCellFunc === 'string'){
-				csvProcessor.perCellFunc = undefined;
-				console.log("セルごとに実行する処理は定義されませんでした",perCellFunc);
-				csvProcessor.perCellFuncFlag = false;
-			}
-			
-			// 出力ファイルごとに実行する処理
-			let perOutputFunc = csvProcessor.makeUserFunc(document.querySelector("textarea[data-processOption='perOutputCode']").value);
-			if(typeof perOutputFunc === 'function'){
-				csvProcessor.perOutputFunc = perOutputFunc;
-				csvProcessor.perOutputFuncFlag = true;
-			}else if(typeof perOutputFunc === 'string'){
-				csvProcessor.perOutputFunc = undefined;
-				console.log("出力ファイルごとに実行する処理は定義されませんでした",perOutputFunc);
-				csvProcessor.perOutputFuncFlag = false;
-			}
-			
-			// 出力ファイル名を設定する処理
-			let outputFileNameFunc = csvProcessor.makeUserFunc(options.outputFileNameCode);
-			if(typeof outputFileNameFunc === 'function'){
-				csvProcessor.outputFileNameFunc = outputFileNameFunc;
-				csvProcessor.outputFileNameFuncFlag = true;
-			}else if(typeof outputFileNameFunc === 'string'){
-				csvProcessor.outputFileNameFunc = undefined;
-				console.log("出力ファイル名を設定する処理は定義されませんでした",outputFileNameFunc);
-				csvProcessor.outputFileNameFuncFlag = false;
-			}
-		}
-		
-		
-		
-		
-		// 入力ファイルの読み込み
-		csvProcessor.inputFileText = "";
-		// csvProcessor.inputFileArray = [];
-		// csvProcessor.inputFileRowTextArray = [];
-		
-		if(!csvProcessor.inputFiles || csvProcessor.inputFiles.length == 0){
-			csvProcessor.dialog("入力ファイルが選択されていません。");
-			return;
-		}
-		for(const [csvIndex,file] of csvProcessor.inputFiles.entries()){
-			console.log(`input file loading: ${csvIndex}`,file);
-			csvProcessor.addLogText("output",`ファイル読み込み中: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
-			
-			//ファイル読み込みパート
-			const fileObj = file.fileObj;
-			const reader = new FileReader();
-			
-			// 同期で読み込み
-			let csvTextArray; // 1文字ずつの配列
-			if(options.inputEncoding == 'AUTO'){ // Encoding.jsを使って自動判定
-				// 重いデータには対応しない
-				reader.readAsArrayBuffer(fileObj);
-				csvTextArray = await new Promise((resolve)=>{reader.onload = ()=>{
-					const uint8Array = new Uint8Array(reader.result);
-					const csvTextArray = Encoding.convert(uint8Array, {to: 'UNICODE',from: 'AUTO',type: 'array'}).map((code)=>String.fromCharCode(code));
-					resolve(csvTextArray);
-				}});
-			}else{
-				reader.readAsArrayBuffer(fileObj);
-				csvTextArray = await new Promise((resolve)=>{reader.onload = ()=>{
-					const uint8Array = new Uint8Array(reader.result);
-					const csvTextArray = csvProcessor.uInt8ArrayToTextArray(uint8Array,options.inputEncoding);
-					resolve(csvTextArray);
-				}});
-			}
-			// 閉じる
-			reader.abort();
-			
-			console.log(`input file loaded: ${csvIndex}`,file);
-			csvProcessor.addLogText("output",`ファイル読み込み完了 加工処理開始: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
-			
-			// 処理パート
-			csvProcessor.inputFileTextObj = csvTextArray;
-			const csvTextToArrayResult = csvProcessor.csvTextToArray(csvTextArray,{
-				delimiter: options.inputDelimiter || ',',
-				lineBreakSelect: options.inputLineBreakSelect=="CUSTOM"?options.inputLineBreakCustom:options.inputLineBreakSelect,
-				skipRowNumber: options.inputSkipRowNumber || 0,
-				skipEmptyRow: options.inputSkipEmptyRow || false,
-				ignoreLastLineBreak: options.inputIgnoreLastLineBreak || false,
-				isUsingHeader: options.inputIsUsingHeader || false,
-				wrapper: options.inputWrapper || '"',
-				isUsingWrapper: options.inputIsUsingWrapper || false,
-				isUsingDelimiterInWrapper: options.inputIsUsingDelimiterInWrapper || false,
-				isUsingWrapperInWrapper: options.inputIsUsingWrapperInWrapper || false,
-				isUsingLineBreakInWrapper: options.inputIsUsingLineBreakInWrapper || false,
-			})
-			
-			console.log(`input file processed: ${csvIndex}`,file);
-			csvProcessor.addLogText("output",`ファイル加工処理完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
-			
-			const csvArray = csvTextToArrayResult.arrayObj;
-			const rowTextArray = csvTextToArrayResult.rowTextObj;
-			// csvProcessor.inputFileArray = csvArray;
-			// csvProcessor.inputFileRowTextArray = rowTextArray;
-			// 処理と書き込み
-			const csvArrayAfterProcess = await csvProcessor.processCsv(csvIndex,csvTextToArrayResult);
-			// console.log(csvArrayAfterProcess);
-			csvProcessor.addLogText("output",`ファイルのすべての処理が完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
-			
-			//csvProcessorをクリーンにする
-			csvProcessor.inputFileTextObj = null;
-			csvProcessor.inputFileText = "";
-		}// inputFileごと
-		await csvProcessor.closeAllOutputStream();
-		console.log("processAll Finished");
-		csvProcessor.addLogText("output","すべての処理が完了");
-	},
-	
-	processCsv: async(csvIndex,csvTextToArrayResult)=>{
-		const csvFile = csvProcessor.inputFiles[csvIndex];
-		console.log(`processCsv Started: ${csvIndex}`,csvFile);
-		const csvArray = csvTextToArrayResult.arrayObj;
-		const rowTextArray = csvTextToArrayResult.rowTextObj;
-		const options = csvProcessor.options;
-		const csvText = csvProcessor.inputFileText;
-		// csvごとに行う処理
-		// ユーザー処理
-		if(csvProcessor.perInputFuncFlag){
-			try{
-				let tmp = csvProcessor.perInputFunc({
-					file: csvFile,
-					fileObj: csvFile.fileObj,
-					csvIndex,
-					csvText,
-					csvArray,
-					options,
-					// csvProcessor
-				});
-			}
-			catch(e){
-				console.error(`入力ファイルごとに実行する処理の実行に失敗しました。`,e);
-			}
-		}
-		for(let [rowIndex,rowArray] of csvArray.entries()){
-			if(rowArray === null)continue;
-			// 行ごとに行う処理
-			const rowText = rowTextArray[rowIndex];
-			// ユーザー処理
-			if(csvProcessor.perRowFuncFlag){
-				try{
-					let tmp = csvProcessor.perRowFunc({
-						file: csvFile,
-						fileObj: csvFile.fileObj,
-						csvIndex,
-						csvText,
-						csvArray,
-						rowIndex,
-						rowArray,
-						rowText,
-						options,
-						// csvProcessor
-					});
-					if (Array.isArray(tmp)) {
-						// csvArray[rowIndex] = tmp;
-						rowArray = tmp;
-					}
-				}
-				catch(e){
-					console.error(`行ごとに実行する処理の実行に失敗しました。`,e);
-				}
-			}
-			for(const [cellIndex,cellText] of rowArray.entries()){
-				// セルごとに行う処理
-				// ユーザー処理
-				if(csvProcessor.perCellFuncFlag){
-					try{
-						let tmp = csvProcessor.perCellFunc({
-							file: csvFile,
-							fileObj: csvFile.fileObj,
-							csvIndex,
-							csvText,
-							csvArray,
-							rowIndex,
-							rowArray,
-							rowText,
-							cellIndex,
-							cellText,
-							options,
-							// csvProcessor
-						});
-						// 戻り値が文字列であれば、cellDataを上書き
-						switch(typeof tmp){
-							case 'string':
-							csvArray[rowIndex][cellIndex] = tmp;
-							break;
-							case 'number':
-							csvArray[rowIndex][cellIndex] = tmp.toString();
-							break;
-							case 'boolean':
-							csvArray[rowIndex][cellIndex] = tmp.toString();
-							break;
-						};
-					}
-					catch(e){
-						console.error(`セルごとに実行する処理の実行に失敗しました。`,e);
-					}
-				}
-			} // セルごと
-			
-			// 出力
-			const outputText = csvProcessor.rowArrayToCsvText(rowArray,{
-				delimiter: options.outputDelimiter || ',',
-				lineBreak: options.outputLineBreak || '\n',
-				isUsingHeader: options.outputIsUsingHeader || false,
-				wrapper: options.outputWrapper || '"',
-				isUsingWrapper: options.outputIsUsingWrapper || false,
-				isUsingWrapperAll: options.outputIsUsingWrapperAll || false,
-				isUsingSpecialCharacterInWrapper: options.outputIsUsingSpecialCharacterInWrapper || false,
-				addLastLineBreak: options.outputAddLastLineBreak || false,
-			});
-			if(rowIndex == 0){
-				if(!csvProcessor.headerText){
-					csvProcessor.headerText = outputText;
-				}
-			}else{
-				
-				let outputFileNames = ["output.csv"];
-				if(csvProcessor.outputFileNameFuncFlag){
-					try{
-						let tmp = csvProcessor.outputFileNameFunc({
-							file: csvFile,
-							fileObj: csvFile.fileObj,
-							csvIndex,
-							csvText,
-							csvArray,
-							rowIndex,
-							rowArray,
-							rowText,
-							options,
-							// csvProcessor
-						});
-						if (typeof tmp === 'string') {
-							outputFileNames = [tmp];
-						} else if (Array.isArray(tmp)) {
-							outputFileNames = tmp;
-						}
-					}
-					catch(e){
-						console.error(`出力ファイル名を設定する処理の実行に失敗しました。`,e);
-					}
-				}
-				for(const outputFileName of outputFileNames){
-					const outputFileFullName = `${outputFileName}`;
-					// 出力ファイルに書き込み
-					await csvProcessor.outputToFile(outputFileFullName,outputText,false);
-				}
-			}
-			
-			
-			
-		} // 行ごと
-		console.log(`processCsv Finished: ${csvIndex}`,csvFile);
-		return csvArray;
-	},
-	
 	processAllStream: async()=>{
 		console.log("processAll Started");
 		csvProcessor.addLogText("output","処理開始");
 		
 		const options = csvProcessor.getOptionsFromHtml();
 		csvProcessor.options = options;
-		csvProcessor.headerText = null;
 		csvProcessor.sessionMemory = {};
 		csvProcessor.inputRowCount = 0;
 		csvProcessor.headerArray = undefined;
@@ -886,9 +552,6 @@ const csvProcessor = {
 				csvProcessor.writeToAllFile(false);
 			}
 			csvProcessor.addLogText("output",`ファイル処理完了: ${csvIndex+1}/${csvProcessor.inputFiles.length}:${file.name}`);
-			//csvProcessorをクリーンにする
-			csvProcessor.inputFileTextObj = null;
-			csvProcessor.inputFileText = "";
 		}// inputFileごと
 
 		if(abortSignal.aborted){
@@ -1606,34 +1269,10 @@ const csvProcessor = {
 			csvTextArray = [...csvTextInput];
 		}
 		
-		let lineBreakRegExp;
-		let lineBreak;
 		// 呼び出し元は、inputLineBreakSelectが"CUSTOM"の場合、ここには"CUSTOM"という文字列ではなく
 		// カスタム改行文字そのもの(inputLineBreakCustom)を渡してくる。そのためここでのCUSTOM判定は
 		// 「既知のキーワードのいずれにも一致しない」ことで行う。
 		const knownLineBreakKeys = ['ALL','LF','CR','CRLF'];
-		switch(options.lineBreakSelect){
-			case 'ALL':
-				lineBreakRegExp = /[\r\n|\r|\n]/;
-				lineBreak = '\r\n';
-				break;
-			case 'LF':
-				lineBreakRegExp = /\n/;
-				lineBreak = '\n';
-				break;
-			case 'CR':
-				lineBreakRegExp = /\r/;
-				lineBreak = '\r';
-				break;
-			case 'CRLF':
-				lineBreakRegExp = /\r\n/;
-				lineBreak = '\r\n';
-				break;
-			default:
-				// カスタム改行文字(空の場合はLF扱い)
-				lineBreak = options.lineBreakSelect || '\n';
-				break;
-		}
 
 		// 今後の処理で、改行コードが2文字以上だと支障があるので、LFに統一
 		// ★データ(ダブルクォーテーション)内の改行もあわせて置換してしまうが、そういう仕様として扱う
@@ -1819,7 +1458,6 @@ const csvProcessor = {
 				for(let i = 0; i < splitTextArray.length; i++){
 					rowText += splitTextArray[i];
 					const char = splitTextArray[i];
-					const lineBreakMatch = (char.match(lineBreakRegExp)||[null])[0];
 					// ここから1文字ずつ処理していく
 					if(inWrapper){
 						switch(char){
@@ -1839,7 +1477,6 @@ const csvProcessor = {
 							}
 							afterWrapperCharacter = false;
 							break;
-							// case lineBreakMatch:
 							case "\n":
 							if(afterWrapperCharacter){
 								inWrapper = false;
@@ -1870,7 +1507,6 @@ const csvProcessor = {
 							cell = "";
 							afterDelimiter = true;
 							break;
-							// case lineBreakMatch:
 							case "\n":
 							if(!afterLineBreak || !options.skipEmptyRow){ // 連続する改行は無視
 								// 改行が出てきたらセルを追加して行を追加
@@ -1890,7 +1526,6 @@ const csvProcessor = {
 						if(char != options.delimiter){
 							afterDelimiter = false
 						};
-						// if(char != lineBreakMatch){
 						if(char != "\n"){
 							afterLineBreak = false
 						};
